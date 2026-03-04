@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Zen Walk</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+</head>
+<body>
+
+  <!-- Full-screen Canvas -->
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- Start Screen Overlay -->
+  <div id="startScreen" class="overlay">
+    <div class="modal">
+      <h1>Zen Walk</h1>
+      <p>A Cosy Endless Walking Simulator</p>
+
+      <div class="input-group">
+        <label for="username">Username:</label>
+        <input type="text" id="username" placeholder="Enter username" required>
+      </div>
+
+      <div class="input-group">
+        <label for="gender">Gender:</label>
+        <select id="gender">
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+          <option value="Non-binary">Non-binary</option>
+        </select>
+      </div>
+
+      <div class="input-group">
+        <label for="petType">Sidekick:</label>
+        <select id="petType">
+          <option value="Dog">Dog 🐕</option>
+          <option value="Cat">Cat 🐈</option>
+          <option value="None">None</option>
+        </select>
+      </div>
+
+      <button id="startBtn">Start Walking</button>
+    </div>
+  </div>
+
+  <!-- Scroll of Statistics Overlay -->
+  <div id="statsOverlay" class="overlay hidden">
+    <div class="scroll">
+      <h2>Scroll of Statistics</h2>
+      <div id="statsContent">
+        <p>Total Steps: <span id="totalSteps">0</span></p>
+        <div id="destroyedElementsList"></div>
+      </div>
+      <button id="closeStatsBtn">Close (B)</button>
+    </div>
+  </div>
+
+  <!-- Virtual Gamepad Overlay -->
+  <div id="gamepad" class="hidden">
+    <div class="d-pad">
+      <button class="d-btn up" id="btnUp"></button>
+      <button class="d-btn left" id="btnLeft"></button>
+      <button class="d-btn right" id="btnRight"></button>
+      <button class="d-btn down" id="btnDown"></button>
+    </div>
+    <div class="action-buttons">
+      <button class="a-btn" id="btnB">B</button>
+      <button class="a-btn" id="btnA">A</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
