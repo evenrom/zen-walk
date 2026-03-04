@@ -1,0 +1,177 @@
+/* style.css */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  touch-action: none; /* Crucial for preventing default mobile gestures */
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #000;
+  font-family: sans-serif;
+}
+
+#gameCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.overlay {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10;
+}
+
+.modal {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  text-align: center;
+  width: 80%;
+  max-width: 400px;
+}
+
+.modal h1 {
+  margin-bottom: 10px;
+}
+
+.input-group {
+  margin-bottom: 15px;
+  text-align: left;
+}
+
+.input-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
+.input-group input, .input-group select {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+button {
+  padding: 10px 20px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Scroll of Statistics */
+.scroll {
+  background: #fdf6e3;
+  padding: 30px;
+  border: 2px solid #8B4513;
+  border-radius: 4px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.5);
+  max-width: 90%;
+  max-height: 80%;
+  overflow-y: auto;
+}
+
+.scroll h2 {
+  color: #8B4513;
+  border-bottom: 2px solid #8B4513;
+  padding-bottom: 10px;
+  margin-bottom: 20px;
+}
+
+.scroll p {
+  font-size: 18px;
+  margin-bottom: 10px;
+}
+
+#destroyedElementsList p {
+  font-size: 16px;
+  margin-left: 10px;
+}
+
+/* Virtual Gamepad */
+#gamepad {
+  position: absolute;
+  bottom: 20px;
+  left: 0;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 20px;
+  z-index: 5;
+  pointer-events: none; /* Let touches pass through the container */
+}
+
+#gamepad * {
+  pointer-events: auto; /* Re-enable touches for buttons */
+}
+
+.d-pad {
+  position: relative;
+  width: 150px;
+  height: 150px;
+}
+
+.d-btn {
+  position: absolute;
+  width: 50px;
+  height: 50px;
+  background-color: rgba(255, 255, 255, 0.5);
+  border: 2px solid #333;
+  border-radius: 10px;
+  /* Prevent default select behaviors */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.d-btn:active, .d-btn.active {
+  background-color: rgba(255, 255, 255, 0.8);
+}
+
+.up { top: 0; left: 50px; }
+.down { bottom: 0; left: 50px; }
+.left { top: 50px; left: 0; }
+.right { top: 50px; right: 0; }
+
+.action-buttons {
+  display: flex;
+  align-items: flex-end;
+  gap: 15px;
+  padding-bottom: 20px;
+}
+
+.a-btn {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background-color: rgba(255, 0, 0, 0.6);
+  color: white;
+  font-weight: bold;
+  font-size: 20px;
+  border: 2px solid #333;
+  /* Prevent default select behaviors */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.a-btn:active, .a-btn.active {
+  background-color: rgba(255, 0, 0, 0.9);
+}
