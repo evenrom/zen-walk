@@ -104,28 +104,30 @@ function initImages() {
   images.tileset_obstacles.onerror = onError;
 }
 
-// --- Mock TILE_MAP Dictionaries ---
+// --- Advanced TILE_MAP Dictionary (96x96 Grid) ---
 const TILE_MAP = {
   // Environment (tileset_environment.png)
   forest_grass: { img: 'tileset_environment', sx: 0, sy: 0 },
-  desert_sand: { img: 'tileset_environment', sx: 96, sy: 0 },
-  city_pavement: { img: 'tileset_environment', sx: 192, sy: 0 },
-  sea_water: { img: 'tileset_environment', sx: 288, sy: 0 },
+  desert_sand: { img: 'tileset_environment', sx: 384, sy: 0 }, // Col 4
+  city_pavement: { img: 'tileset_environment', sx: 0, sy: 192 }, // Row 2, Col 0
+  sea_water: { img: 'tileset_environment', sx: 768, sy: 0 }, // Col 8
 
   // Obstacles (tileset_obstacles.png)
   // Forest
-  forest_small_tree: { img: 'tileset_obstacles', sx: 0, sy: 0, w: 1, h: 1 },
-  forest_tall_tree: { img: 'tileset_obstacles', sx: 96, sy: 0, w: 1, h: 2 },
-  forest_large_tree: { img: 'tileset_obstacles', sx: 192, sy: 0, w: 2, h: 2 },
+  forest_small_tree: { img: 'tileset_obstacles', sx: 384, sy: 0, w: 1, h: 1 }, // Col 4, Row 0
+  forest_tall_tree: { img: 'tileset_obstacles', sx: 0, sy: 384, w: 1, h: 2 }, // Col 0, Row 4
+  forest_large_tree: { img: 'tileset_obstacles', sx: 0, sy: 192, w: 2, h: 2 }, // Col 0, Row 2
+  
   // Desert
-  desert_rock: { img: 'tileset_obstacles', sx: 0, sy: 192, w: 1, h: 1 },
-  desert_cactus: { img: 'tileset_obstacles', sx: 96, sy: 192, w: 1, h: 2 },
-  desert_large_rock: { img: 'tileset_obstacles', sx: 192, sy: 192, w: 2, h: 2 },
-  // City
-  city_trashcan: { img: 'tileset_obstacles', sx: 0, sy: 384, w: 1, h: 1 },
-  city_lamppost: { img: 'tileset_obstacles', sx: 96, sy: 384, w: 1, h: 2 },
-  city_fountain: { img: 'tileset_obstacles', sx: 192, sy: 384, w: 2, h: 2 }
-};
+  desert_rock: { img: 'tileset_obstacles', sx: 0, sy: 96, w: 1, h: 1 }, // Col 0, Row 1
+  desert_cactus: { img: 'tileset_obstacles', sx: 96, sy: 384, w: 1, h: 2 }, // Col 1, Row 4
+  desert_large_rock: { img: 'tileset_obstacles', sx: 384, sy: 192, w: 2, h: 2 }, // Col 4, Row 2
+  
+  // City (Using Barrel, Pillar, and Well as placeholders)
+  city_trashcan: { img: 'tileset_obstacles', sx: 480, sy: 0, w: 1, h: 1 }, // Barrel: Col 5, Row 0
+  city_lamppost: { img: 'tileset_obstacles', sx: 192, sy: 384, w: 1, h: 2 }, // Pillar: Col 2, Row 4
+  city_fountain: { img: 'tileset_obstacles', sx: 480, sy: 384, w: 2, h: 2 }  // Well: Col 5, Row 4
+};;
 
 
 // --- Initialization ---
