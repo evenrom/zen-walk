@@ -769,29 +769,40 @@ function getDirRow(dir) {
   }
 }
 
-function getAssetMapping(type) {
-  if (TILE_MAP[type]) return TILE_MAP[type];
+function getAssetMapping(type, tx = 0, ty = 0) {
+  let assetGroup = TILE_MAP[type];
   
-  if (type.includes('_small_obstacle')) {
-     if (type.startsWith('forest')) return TILE_MAP.forest_small_tree;
-     if (type.startsWith('desert')) return TILE_MAP.desert_rock;
-     if (type.startsWith('city')) return TILE_MAP.city_trashcan;
+  if (!assetGroup) {
+      if (type.includes('_small_obstacle')) {
+         if (type.startsWith('forest')) assetGroup = TILE_MAP.forest_small_obstacle;
+         if (type.startsWith('desert')) assetGroup = TILE_MAP.desert_small_obstacle;
+         if (type.startsWith('city')) assetGroup = TILE_MAP.city_small_obstacle;
+      }
+      if (type.includes('_tall_obstacle_anchor')) {
+         if (type.startsWith('forest')) assetGroup = TILE_MAP.forest_tall_obstacle_anchor;
+         if (type.startsWith('desert')) assetGroup = TILE_MAP.desert_tall_obstacle_anchor;
+         if (type.startsWith('city')) assetGroup = TILE_MAP.city_tall_obstacle_anchor;
+      }
+      if (type.includes('_large_obstacle_anchor')) {
+         if (type.startsWith('forest')) assetGroup = TILE_MAP.forest_large_obstacle_anchor;
+         if (type.startsWith('desert')) assetGroup = TILE_MAP.desert_large_obstacle_anchor;
+         if (type.startsWith('city')) assetGroup = TILE_MAP.city_large_obstacle_anchor;
+      }
   }
-  if (type.includes('_tall_obstacle_anchor')) {
-     if (type.startsWith('forest')) return TILE_MAP.forest_tall_tree;
-     if (type.startsWith('desert')) return TILE_MAP.desert_cactus;
-     if (type.startsWith('city')) return TILE_MAP.city_lamppost;
+
+  if (!assetGroup) return null;
+
+  // If it's an array of variations, pick one deterministically based on coordinates
+  if (Array.isArray(assetGroup)) {
+      const hash = pseudoRandom(tx * 3.14, ty * 2.71); 
+      const index = Math.floor(hash * assetGroup.length);
+      return assetGroup[index];
   }
-  if (type.includes('_large_obstacle_anchor')) {
-     if (type.startsWith('forest')) return TILE_MAP.forest_large_tree;
-     if (type.startsWith('desert')) return TILE_MAP.desert_large_rock;
-     if (type.startsWith('city')) return TILE_MAP.city_fountain;
-  }
-  
-  return null;
+
+  return assetGroup;
 }
 
-function drawEntity(screenX, screenY, type, state, dir, frame) {
+function drawEntity(screenX, screenY, type, state, dir, frame, tx = 0, ty = 0) {
   if (['player', 'dog', 'cat'].includes(type)) {
     let img;
     if (type === 'player') {
@@ -813,7 +824,7 @@ function drawEntity(screenX, screenY, type, state, dir, frame) {
     return;
   }
   
-  const asset = getAssetMapping(type);
+  const asset = getAssetMapping(type, tx, ty);
   if (asset) {
     const imgObj = images[asset.img];
     if (imgObj && imgObj.complete && imgObj.naturalWidth > 0) {
@@ -838,7 +849,6 @@ function render() {
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   
-  // Camera now follows player's pixel coordinates smoothly
   cameraX = player.pixelX - canvas.width / 2 + TILE_SIZE / 2;
   cameraY = player.pixelY - canvas.height / 2 + TILE_SIZE / 2;
   
@@ -852,7 +862,7 @@ function render() {
                    tile.biome === 'desert' ? 'desert_sand' : 
                    tile.biome === 'city' ? 'city_pavement' : 'sea_water';
                    
-    drawEntity(screenX, screenY, baseType, 'idle', 'down', 0);
+    drawEntity(screenX, screenY, baseType, 'idle', 'down', 0, tx, ty);
   }
   
   for (let key in activeTiles) {
@@ -861,7 +871,7 @@ function render() {
       const [tx, ty] = key.split(',').map(Number);
       const screenX = tx * TILE_SIZE - cameraX;
       const screenY = ty * TILE_SIZE - cameraY;
-      drawEntity(screenX, screenY, tile.type, 'idle', 'down', 0);
+      drawEntity(screenX, screenY, tile.type, 'idle', 'down', 0, tx, ty);
     }
   }
   
