@@ -104,30 +104,75 @@ function initImages() {
   images.tileset_obstacles.onerror = onError;
 }
 
-// --- Advanced TILE_MAP Dictionary (96x96 Grid) ---
+// --- Advanced TILE_MAP Dictionary with Variations (96x96 Grid) ---
 const TILE_MAP = {
-  // Environment (tileset_environment.png)
-  forest_grass: { img: 'tileset_environment', sx: 0, sy: 0 },
-  desert_sand: { img: 'tileset_environment', sx: 384, sy: 0 }, // Col 4
-  city_pavement: { img: 'tileset_environment', sx: 0, sy: 192 }, // Row 2, Col 0
-  sea_water: { img: 'tileset_environment', sx: 768, sy: 0 }, // Col 8
+  // Environment (Arrays of variations)
+  forest_grass: [
+    { img: 'tileset_environment', sx: 0, sy: 0 },
+    { img: 'tileset_environment', sx: 96, sy: 0 },
+    { img: 'tileset_environment', sx: 192, sy: 0 },
+    { img: 'tileset_environment', sx: 288, sy: 0 }
+  ],
+  desert_sand: [
+    { img: 'tileset_environment', sx: 384, sy: 0 },
+    { img: 'tileset_environment', sx: 480, sy: 0 },
+    { img: 'tileset_environment', sx: 576, sy: 0 },
+    { img: 'tileset_environment', sx: 672, sy: 0 }
+  ],
+  city_pavement: [
+    { img: 'tileset_environment', sx: 0, sy: 192 },
+    { img: 'tileset_environment', sx: 96, sy: 192 },
+    { img: 'tileset_environment', sx: 192, sy: 192 }
+  ],
+  sea_water: [
+    { img: 'tileset_environment', sx: 768, sy: 0 },
+    { img: 'tileset_environment', sx: 864, sy: 0 }
+  ],
 
-  // Obstacles (tileset_obstacles.png)
+  // Obstacles
   // Forest
-  forest_small_tree: { img: 'tileset_obstacles', sx: 384, sy: 0, w: 1, h: 1 }, // Col 4, Row 0
-  forest_tall_tree: { img: 'tileset_obstacles', sx: 0, sy: 384, w: 1, h: 2 }, // Col 0, Row 4
-  forest_large_tree: { img: 'tileset_obstacles', sx: 0, sy: 192, w: 2, h: 2 }, // Col 0, Row 2
+  forest_small_obstacle: [
+    { img: 'tileset_obstacles', sx: 384, sy: 0, w: 1, h: 1 }, // Small Tree
+    { img: 'tileset_obstacles', sx: 288, sy: 0, w: 1, h: 1 }, // Mushrooms
+    { img: 'tileset_obstacles', sx: 0, sy: 0, w: 1, h: 1 },   // Rock 1
+    { img: 'tileset_obstacles', sx: 96, sy: 0, w: 1, h: 1 }   // Rock 2
+  ],
+  forest_tall_obstacle_anchor: [
+    { img: 'tileset_obstacles', sx: 0, sy: 384, w: 1, h: 2 }  // Pine
+  ],
+  forest_large_obstacle_anchor: [
+    { img: 'tileset_obstacles', sx: 0, sy: 192, w: 2, h: 2 }, // Oak 1
+    { img: 'tileset_obstacles', sx: 192, sy: 192, w: 2, h: 2 } // Oak 2
+  ],
   
   // Desert
-  desert_rock: { img: 'tileset_obstacles', sx: 0, sy: 96, w: 1, h: 1 }, // Col 0, Row 1
-  desert_cactus: { img: 'tileset_obstacles', sx: 96, sy: 384, w: 1, h: 2 }, // Col 1, Row 4
-  desert_large_rock: { img: 'tileset_obstacles', sx: 384, sy: 192, w: 2, h: 2 }, // Col 4, Row 2
+  desert_small_obstacle: [
+    { img: 'tileset_obstacles', sx: 480, sy: 96, w: 1, h: 1 }, // Small Cactus
+    { img: 'tileset_obstacles', sx: 96, sy: 96, w: 1, h: 1 },  // Desert Rock 1
+    { img: 'tileset_obstacles', sx: 192, sy: 96, w: 1, h: 1 }, // Desert Rock 2
+    { img: 'tileset_obstacles', sx: 384, sy: 96, w: 1, h: 1 }  // Lizard/Bone
+  ],
+  desert_tall_obstacle_anchor: [
+    { img: 'tileset_obstacles', sx: 96, sy: 384, w: 1, h: 2 }  // Tall Cactus
+  ],
+  desert_large_obstacle_anchor: [
+    { img: 'tileset_obstacles', sx: 384, sy: 192, w: 2, h: 2 }, // Mesa Rock
+    { img: 'tileset_obstacles', sx: 576, sy: 192, w: 2, h: 2 }  // Archway
+  ],
   
-  // City (Using Barrel, Pillar, and Well as placeholders)
-  city_trashcan: { img: 'tileset_obstacles', sx: 480, sy: 0, w: 1, h: 1 }, // Barrel: Col 5, Row 0
-  city_lamppost: { img: 'tileset_obstacles', sx: 192, sy: 384, w: 1, h: 2 }, // Pillar: Col 2, Row 4
-  city_fountain: { img: 'tileset_obstacles', sx: 480, sy: 384, w: 2, h: 2 }  // Well: Col 5, Row 4
-};;
+  // City
+  city_small_obstacle: [
+    { img: 'tileset_obstacles', sx: 480, sy: 0, w: 1, h: 1 }, // Barrel
+    { img: 'tileset_obstacles', sx: 576, sy: 0, w: 1, h: 1 }, // Crate
+    { img: 'tileset_obstacles', sx: 672, sy: 96, w: 1, h: 1 } // Post
+  ],
+  city_tall_obstacle_anchor: [
+    { img: 'tileset_obstacles', sx: 192, sy: 384, w: 1, h: 2 } // Pillar
+  ],
+  city_large_obstacle_anchor: [
+    { img: 'tileset_obstacles', sx: 576, sy: 384, w: 2, h: 2 } // Well
+  ]
+};
 
 
 // --- Initialization ---
@@ -632,74 +677,60 @@ function getDirRow(dir) {
   }
 }
 
-// Map logical types to sprite assets
-function getAssetMapping(type) {
-  if (TILE_MAP[type]) return TILE_MAP[type];
+function getAssetMapping(type, tx = 0, ty = 0) {
+  let assetGroup = TILE_MAP[type];
+  
+  if (!assetGroup) {
+      if (type.includes('_small_obstacle')) {
+         if (type.startsWith('forest')) assetGroup = TILE_MAP.forest_small_obstacle;
+         if (type.startsWith('desert')) assetGroup = TILE_MAP.desert_small_obstacle;
+         if (type.startsWith('city')) assetGroup = TILE_MAP.city_small_obstacle;
+      }
+      if (type.includes('_tall_obstacle_anchor')) {
+         if (type.startsWith('forest')) assetGroup = TILE_MAP.forest_tall_obstacle_anchor;
+         if (type.startsWith('desert')) assetGroup = TILE_MAP.desert_tall_obstacle_anchor;
+         if (type.startsWith('city')) assetGroup = TILE_MAP.city_tall_obstacle_anchor;
+      }
+      if (type.includes('_large_obstacle_anchor')) {
+         if (type.startsWith('forest')) assetGroup = TILE_MAP.forest_large_obstacle_anchor;
+         if (type.startsWith('desert')) assetGroup = TILE_MAP.desert_large_obstacle_anchor;
+         if (type.startsWith('city')) assetGroup = TILE_MAP.city_large_obstacle_anchor;
+      }
+  }
 
-  // Handle procedural obstacle anchors mapping
-  if (type.includes('_small_obstacle')) {
-     if (type.startsWith('forest')) return TILE_MAP.forest_small_tree;
-     if (type.startsWith('desert')) return TILE_MAP.desert_rock;
-     if (type.startsWith('city')) return TILE_MAP.city_trashcan;
-  }
-  if (type.includes('_tall_obstacle_anchor')) {
-     if (type.startsWith('forest')) return TILE_MAP.forest_tall_tree;
-     if (type.startsWith('desert')) return TILE_MAP.desert_cactus;
-     if (type.startsWith('city')) return TILE_MAP.city_lamppost;
-  }
-  if (type.includes('_large_obstacle_anchor')) {
-     if (type.startsWith('forest')) return TILE_MAP.forest_large_tree;
-     if (type.startsWith('desert')) return TILE_MAP.desert_large_rock;
-     if (type.startsWith('city')) return TILE_MAP.city_fountain;
+  if (!assetGroup) return null;
+
+  // If it's an array of variations, pick one deterministically based on coordinates
+  if (Array.isArray(assetGroup)) {
+      const hash = pseudoRandom(tx * 3.14, ty * 2.71); 
+      const index = Math.floor(hash * assetGroup.length);
+      return assetGroup[index];
   }
 
-  // Fallback
-  return null;
+  return assetGroup;
 }
 
-function drawEntity(screenX, screenY, type, state, dir, frame) {
-  // If it's a character or pet
+function drawEntity(screenX, screenY, type, state, dir, frame, tx = 0, ty = 0) {
   if (['player', 'dog', 'cat'].includes(type)) {
     let img;
-    if (type === 'player') {
-      img = images[`player_${userProfile.gender}`] || images.player_Female;
-    } else if (type === 'dog') {
-      img = images.pet_Dog;
-    } else if (type === 'cat') {
-      img = images.pet_Cat;
-    }
-
+    if (type === 'player') img = images[`player_${userProfile.gender}`] || images.player_Female;
+    else if (type === 'dog') img = images.pet_Dog;
+    else if (type === 'cat') img = images.pet_Cat;
+    
     if (img && img.complete && img.naturalWidth > 0) {
       const row = getDirRow(dir);
-      const col = frame; // 0, 1, 2
-      ctx.drawImage(img, col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE, screenX, screenY, TILE_SIZE, TILE_SIZE);
-    } else {
-      // Fallback rect if image failed to load
-      ctx.fillStyle = type === 'player' ? 'blue' : 'orange';
-      ctx.fillRect(screenX + 24, screenY + 24, 48, 48);
+      ctx.drawImage(img, frame * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE, screenX, screenY, TILE_SIZE, TILE_SIZE);
     }
     return;
   }
-
-  // If it's an environment or obstacle tile
-  const asset = getAssetMapping(type);
+  
+  const asset = getAssetMapping(type, tx, ty);
   if (asset) {
     const imgObj = images[asset.img];
     if (imgObj && imgObj.complete && imgObj.naturalWidth > 0) {
       const w = (asset.w || 1) * TILE_SIZE;
       const h = (asset.h || 1) * TILE_SIZE;
       ctx.drawImage(imgObj, asset.sx, asset.sy, w, h, screenX, screenY, w, h);
-    } else {
-       // Fallback colors for missing assets
-       if (type.includes('water')) ctx.fillStyle = 'blue';
-       else if (type.includes('forest')) ctx.fillStyle = 'darkgreen';
-       else if (type.includes('desert')) ctx.fillStyle = 'khaki';
-       else if (type.includes('city')) ctx.fillStyle = 'gray';
-       else ctx.fillStyle = 'purple';
-
-       const w = (asset.w || 1) * TILE_SIZE;
-       const h = (asset.h || 1) * TILE_SIZE;
-       ctx.fillRect(screenX, screenY, w, h);
     }
   }
 }
@@ -724,7 +755,7 @@ function render() {
                    tile.biome === 'desert' ? 'desert_sand' :
                    tile.biome === 'city' ? 'city_pavement' : 'sea_water';
 
-    drawEntity(screenX, screenY, baseType, 'idle', 'down', 0);
+    drawEntity(screenX, screenY, baseType, 'idle', 'down', 0, tx, ty);
   }
 
   // Draw World - Layer 2: Obstacles (Anchors only, sorted by Y to support depth later)
@@ -734,7 +765,7 @@ function render() {
       const [tx, ty] = key.split(',').map(Number);
       const screenX = tx * TILE_SIZE - cameraX;
       const screenY = ty * TILE_SIZE - cameraY;
-      drawEntity(screenX, screenY, tile.type, 'idle', 'down', 0);
+      drawEntity(screenX, screenY, baseType, 'idle', 'down', 0, tx, ty);
     }
   }
 
