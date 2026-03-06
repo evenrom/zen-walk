@@ -33,11 +33,31 @@ const SYNC_THRESHOLD = 100;
 
 // World Data (Amnesia Map)
 let activeTiles = {}; // "x,y" -> { type, biome, destructible, multiTileParent }
-const OFF_SCREEN_BUFFER = 2; // Extra tiles rendered outside view
+const OFF_SCREEN_BUFFER = 5; // Extra tiles rendered outside view
+
+// Movement Constants
+const MOVE_DURATION = 200; // ms
 
 // Entities
-let player = { x: 0, y: 0, dir: 'down', state: 'idle', frame: 1, moveQueue: [] };
-let sidekick = { x: 0, y: 0, dir: 'down', state: 'idle', frame: 1, active: false, queue: [] };
+let player = {
+  x: 0, y: 0,
+  pixelX: 0, pixelY: 0,
+  targetX: 0, targetY: 0,
+  startX: 0, startY: 0,
+  dir: 'down', state: 'idle', frame: 1,
+  isMoving: false, moveTimer: 0, legToggle: false
+};
+
+let sidekick = {
+  x: 0, y: 0,
+  pixelX: 0, pixelY: 0,
+  targetX: 0, targetY: 0,
+  startX: 0, startY: 0,
+  dir: 'down', state: 'idle', frame: 1,
+  active: false, isMoving: false, moveTimer: 0,
+  queue: [] // Holds {x, y, dir} of player's previous grid positions
+};
+
 let particles = [];
 
 // Input
@@ -63,7 +83,7 @@ const images = {
 };
 
 let imagesLoaded = 0;
-const totalImages = 6; // We expect 6 main ones, we'll map Nonbinary to Female for now
+const totalImages = 6;
 
 function initImages() {
   const startBtn = document.getElementById('startBtn');
@@ -78,7 +98,6 @@ function initImages() {
     }
   };
 
-  // Assign mock sources, in a real app these would be real paths
   images.player_Male.onload = onLoad; images.player_Male.src = 'player_male.png';
   images.player_Female.onload = onLoad; images.player_Female.src = 'player_female.png';
   images.player_Nonbinary = images.player_Female; // fallback
@@ -87,7 +106,6 @@ function initImages() {
   images.tileset_environment.onload = onLoad; images.tileset_environment.src = 'tileset_environment.png';
   images.tileset_obstacles.onload = onLoad; images.tileset_obstacles.src = 'tileset_obstacles.png';
 
-  // If images fail to load (because they don't exist yet), we still want to enable the button eventually for testing
   const onError = () => {
     imagesLoaded++;
     if (imagesLoaded >= totalImages) {
@@ -106,22 +124,17 @@ function initImages() {
 
 // --- Mock TILE_MAP Dictionaries ---
 const TILE_MAP = {
-  // Environment (tileset_environment.png)
   forest_grass: { img: 'tileset_environment', sx: 0, sy: 0 },
   desert_sand: { img: 'tileset_environment', sx: 96, sy: 0 },
   city_pavement: { img: 'tileset_environment', sx: 192, sy: 0 },
   sea_water: { img: 'tileset_environment', sx: 288, sy: 0 },
 
-  // Obstacles (tileset_obstacles.png)
-  // Forest
   forest_small_tree: { img: 'tileset_obstacles', sx: 0, sy: 0, w: 1, h: 1 },
   forest_tall_tree: { img: 'tileset_obstacles', sx: 96, sy: 0, w: 1, h: 2 },
   forest_large_tree: { img: 'tileset_obstacles', sx: 192, sy: 0, w: 2, h: 2 },
-  // Desert
   desert_rock: { img: 'tileset_obstacles', sx: 0, sy: 192, w: 1, h: 1 },
   desert_cactus: { img: 'tileset_obstacles', sx: 96, sy: 192, w: 1, h: 2 },
   desert_large_rock: { img: 'tileset_obstacles', sx: 192, sy: 192, w: 2, h: 2 },
-  // City
   city_trashcan: { img: 'tileset_obstacles', sx: 0, sy: 384, w: 1, h: 1 },
   city_lamppost: { img: 'tileset_obstacles', sx: 96, sy: 384, w: 1, h: 2 },
   city_fountain: { img: 'tileset_obstacles', sx: 192, sy: 384, w: 2, h: 2 }
@@ -133,7 +146,6 @@ window.onload = () => {
   canvas = document.getElementById('gameCanvas');
   ctx = canvas.getContext('2d');
 
-  // Disable image smoothing for pixel art look
   ctx.imageSmoothingEnabled = false;
 
   resizeCanvas();
@@ -157,7 +169,7 @@ window.onload = () => {
 function resizeCanvas() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
-  ctx.imageSmoothingEnabled = false; // Need to re-apply after resize
+  ctx.imageSmoothingEnabled = false;
 }
 
 function setupDOM() {
@@ -177,10 +189,15 @@ function setupDOM() {
     document.getElementById('startScreen').classList.add('hidden');
     document.getElementById('gamepad').classList.remove('hidden');
 
+    player.pixelX = player.x * TILE_SIZE;
+    player.pixelY = player.y * TILE_SIZE;
+
     if (userProfile.petType !== "None") {
       sidekick.active = true;
       sidekick.x = player.x;
       sidekick.y = player.y;
+      sidekick.pixelX = sidekick.x * TILE_SIZE;
+      sidekick.pixelY = sidekick.y * TILE_SIZE;
     }
 
     initAudio();
@@ -192,7 +209,6 @@ function setupDOM() {
     e.preventDefault();
     togglePause();
   });
-  // Also bind mousedown for desktop testing/verification
   btnB.addEventListener('mousedown', (e) => {
     e.preventDefault();
     togglePause();
@@ -371,18 +387,15 @@ function soundThud() {
 
 // --- Deterministic Biome Generation ---
 function pseudoRandom(x, y) {
-  // Simple deterministic hash based on coordinates
   let n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453123;
   return n - Math.floor(n);
 }
 
 function getBiome(x, y) {
-  // Use a larger scale for contiguous biomes
-  const scale = 0.1;
+  const scale = 0.02; // Much larger continuous biomes
   const nx = Math.floor(x * scale);
   const ny = Math.floor(y * scale);
 
-  // Hash the macro block
   const n = pseudoRandom(nx, ny);
 
   if (n < 0.3) return 'forest';
@@ -403,42 +416,34 @@ function generateTile(x, y) {
   if (biome === 'sea') {
     tileData.type = 'sea_water';
     tileData.solid = true;
-    return tileData; // Sea has no obstacles
+    return tileData;
   }
 
-  // Set base ground type based on biome
   if (biome === 'forest') tileData.type = 'forest_grass';
   if (biome === 'desert') tileData.type = 'desert_sand';
   if (biome === 'city') tileData.type = 'city_pavement';
 
-  // Fine-grained noise for obstacle placement
   const localNoise = pseudoRandom(x + 1000, y + 1000);
 
-  // Don't spawn obstacles too close to 0,0 so player isn't trapped immediately
   if (Math.abs(x) < 2 && Math.abs(y) < 2) return tileData;
 
   if (localNoise < 0.10) {
-    // 2x2 Large Obstacle
     tileData.type = `${biome}_large_obstacle_anchor`;
     tileData.solid = true;
     tileData.destructible = false;
 
-    // Project footprint
     activeTiles[getTileKey(x+1, y)] = { type: 'multi_part', biome: biome, destructible: false, solid: true, multiTileParent: getTileKey(x,y) };
     activeTiles[getTileKey(x, y+1)] = { type: 'multi_part', biome: biome, destructible: false, solid: true, multiTileParent: getTileKey(x,y) };
     activeTiles[getTileKey(x+1, y+1)] = { type: 'multi_part', biome: biome, destructible: false, solid: true, multiTileParent: getTileKey(x,y) };
 
   } else if (localNoise < 0.15) {
-    // 1x2 Tall Obstacle
     tileData.type = `${biome}_tall_obstacle_anchor`;
     tileData.solid = true;
     tileData.destructible = false;
 
-    // Project footprint (takes up current tile and one below it)
     activeTiles[getTileKey(x, y+1)] = { type: 'multi_part', biome: biome, destructible: false, solid: true, multiTileParent: getTileKey(x,y) };
 
   } else if (localNoise < 0.30) {
-    // 1x1 Small Obstacle
     tileData.type = `${biome}_small_obstacle`;
     tileData.solid = true;
     tileData.destructible = true;
@@ -448,25 +453,27 @@ function generateTile(x, y) {
 }
 
 function updateWorld() {
+  // Use a slightly larger radius for generating to prevent pop-in
   const viewRadiusX = Math.ceil(canvas.width / 2 / TILE_SIZE) + OFF_SCREEN_BUFFER;
   const viewRadiusY = Math.ceil(canvas.height / 2 / TILE_SIZE) + OFF_SCREEN_BUFFER;
 
+  // Use current logical x, y to calculate center of generation
   const minX = player.x - viewRadiusX;
   const maxX = player.x + viewRadiusX;
   const minY = player.y - viewRadiusY;
   const maxY = player.y + viewRadiusY;
 
   // 1. Cull off-screen tiles (Amnesia)
+  // Ensure we don't cull tiles we just generated or are about to generate
+  const cullBuffer = 3;
   for (let key in activeTiles) {
     const [tx, ty] = key.split(',').map(Number);
-    if (tx < minX - 2 || tx > maxX + 2 || ty < minY - 2 || ty > maxY + 2) {
-       // Only aggressive cull if far enough out so multi-tiles don't pop
+    if (tx < minX - cullBuffer || tx > maxX + cullBuffer || ty < minY - cullBuffer || ty > maxY + cullBuffer) {
        delete activeTiles[key];
     }
   }
 
   // 2. Generate missing tiles
-  // Must generate row by row, top-left to bottom-right to respect anchors
   for (let y = minY; y <= maxY; y++) {
     for (let x = minX; x <= maxX; x++) {
       const key = getTileKey(x, y);
@@ -478,18 +485,15 @@ function updateWorld() {
 }
 
 // --- Core Logic ---
-let moveCooldown = 0;
 let lastIdleTime = 0;
-let animationTimer = 0;
 
-// Returns true if tile is solid (blocks movement)
 function isSolid(tile) {
   if (!tile) return false;
   return tile.solid;
 }
 
 function handleActionA() {
-  if (currentState !== GAME_STATE.PLAYING) return;
+  if (currentState !== GAME_STATE.PLAYING || player.isMoving) return;
 
   let targetX = player.x;
   let targetY = player.y;
@@ -504,47 +508,63 @@ function handleActionA() {
 
   if (targetTile) {
     if (targetTile.destructible) {
-      // Success
       soundCut();
       spawnParticle(targetX, targetY, "+1", '#FFF');
       incrementDestroyed(targetTile.type);
 
-      // Clear tile (turn to base ground)
       const baseGroundType = targetTile.biome === 'forest' ? 'forest_grass' :
                              targetTile.biome === 'desert' ? 'desert_sand' : 'city_pavement';
       activeTiles[key] = { type: baseGroundType, biome: targetTile.biome, destructible: false, solid: false, multiTileParent: null };
 
     } else if (targetTile.solid) {
-      // Failure (hit water, 1x2, or 2x2)
       soundThud();
     }
   }
 }
 
-function updatePlayer(dt) {
-  if (moveCooldown > 0) {
-    moveCooldown -= dt;
-    return;
+function lerp(start, end, t) {
+  return start + (end - start) * t;
+}
+
+function moveEntity(entity, dt) {
+  entity.moveTimer += dt;
+  let t = entity.moveTimer / MOVE_DURATION;
+
+  if (t >= 1.0) {
+    // Finish movement
+    entity.pixelX = entity.targetX * TILE_SIZE;
+    entity.pixelY = entity.targetY * TILE_SIZE;
+    entity.x = entity.targetX;
+    entity.y = entity.targetY;
+    entity.isMoving = false;
+    entity.moveTimer = 0;
+
+    // Snap to idle frame if not immediately starting another move later
+    entity.frame = 1;
+
+    return true; // Finished
+  } else {
+    // Interpolate
+    entity.pixelX = lerp(entity.startX * TILE_SIZE, entity.targetX * TILE_SIZE, t);
+    entity.pixelY = lerp(entity.startY * TILE_SIZE, entity.targetY * TILE_SIZE, t);
+
+    // Lock animation frame while moving
+    entity.frame = entity.legToggle ? 2 : 0;
+    return false;
   }
+}
 
+function tryStartPlayerMove() {
   let dx = 0; let dy = 0;
-  let moved = false;
+  let newDir = player.dir;
 
-  if (keys.up) { dy = -1; player.dir = 'up'; moved = true; }
-  else if (keys.down) { dy = 1; player.dir = 'down'; moved = true; }
-  else if (keys.left) { dx = -1; player.dir = 'left'; moved = true; }
-  else if (keys.right) { dx = 1; player.dir = 'right'; moved = true; }
+  if (keys.up) { dy = -1; newDir = 'up'; }
+  else if (keys.down) { dy = 1; newDir = 'down'; }
+  else if (keys.left) { dx = -1; newDir = 'left'; }
+  else if (keys.right) { dx = 1; newDir = 'right'; }
 
-  if (moved) {
-    player.state = 'walking';
-    // Update walk cycle (0, 1, 2, 1, 0...)
-    animationTimer += dt;
-    if (animationTimer > 150) {
-        player.frame = player.frame === 0 ? 2 : 0; // Ping-pong legs, simplify for now
-        if (sidekick.active) sidekick.frame = player.frame;
-        animationTimer = 0;
-    }
-
+  if (dx !== 0 || dy !== 0) {
+    player.dir = newDir;
     const targetX = player.x + dx;
     const targetY = player.y + dy;
     const key = getTileKey(targetX, targetY);
@@ -556,44 +576,104 @@ function updatePlayer(dt) {
     const tile = activeTiles[key];
 
     if (isSolid(tile)) {
-      // Blocked
+      // Bumping into wall
       player.state = 'idle';
-      player.frame = 1; // Idle frame
-      if (sidekick.active) sidekick.frame = 1;
-
-      if (moveCooldown <= 0) {
-         soundThud();
-         moveCooldown = 200;
-      }
+      player.frame = 1;
+      soundThud();
+      // Add a small cooldown even if we failed so we don't spam thud
+      player.isMoving = true;
+      player.targetX = player.x;
+      player.targetY = player.y;
+      player.startX = player.x;
+      player.startY = player.y;
+      player.moveTimer = MOVE_DURATION / 2; // Shorter lock for a bump
     } else {
-      // Move
-      player.x = targetX;
-      player.y = targetY;
-      moveCooldown = 200; // Move speed
-      lastIdleTime = performance.now();
+      // Start moving
+      player.isMoving = true;
+      player.state = 'walking';
+      player.targetX = targetX;
+      player.targetY = targetY;
+      player.startX = player.x;
+      player.startY = player.y;
+      player.moveTimer = 0;
+      player.legToggle = !player.legToggle;
 
-      incrementStep();
-
+      // Queue sidekick move immediately when player commits to a step
       if (sidekick.active) {
         sidekick.queue.push({x: player.x, y: player.y, dir: player.dir});
-        if (sidekick.queue.length > 1) {
-          const nextPos = sidekick.queue.shift();
-          sidekick.x = nextPos.x;
-          sidekick.y = nextPos.y;
-          sidekick.dir = nextPos.dir;
-        }
       }
     }
   } else {
+    // Not pressing movement keys
     player.state = 'idle';
-    player.frame = 1; // Idle frame
-    if (sidekick.active) sidekick.frame = 1;
+    player.frame = 1;
+  }
+}
 
-    if (sidekick.active && performance.now() - lastIdleTime > 2000) {
-       if (sidekick.x < player.x) sidekick.dir = 'right';
-       else if (sidekick.x > player.x) sidekick.dir = 'left';
-       else if (sidekick.y < player.y) sidekick.dir = 'down';
-       else if (sidekick.y > player.y) sidekick.dir = 'up';
+function updatePlayerAndSidekick(dt) {
+  if (player.isMoving) {
+    if (moveEntity(player, dt)) {
+      // Movement finished this frame
+      incrementStep();
+      lastIdleTime = performance.now();
+
+      // Start sidekick movement if it has something queued and isn't already moving
+      if (sidekick.active && !sidekick.isMoving && sidekick.queue.length > 0) {
+         const nextPos = sidekick.queue.shift();
+         sidekick.isMoving = true;
+         sidekick.state = 'walking';
+         sidekick.targetX = nextPos.x;
+         sidekick.targetY = nextPos.y;
+         sidekick.startX = sidekick.x;
+         sidekick.startY = sidekick.y;
+         sidekick.dir = nextPos.dir;
+         sidekick.moveTimer = 0;
+         sidekick.legToggle = player.legToggle; // Match player leg for sync
+      }
+    }
+  } else {
+    tryStartPlayerMove();
+  }
+
+  if (sidekick.active) {
+    if (sidekick.isMoving) {
+      if(moveEntity(sidekick, dt)) {
+         // Sidekick finished moving
+         // If there's MORE in the queue (e.g. player moved fast), start next immediately
+         if (sidekick.queue.length > 0 && !player.isMoving) {
+             const nextPos = sidekick.queue.shift();
+             sidekick.isMoving = true;
+             sidekick.targetX = nextPos.x;
+             sidekick.targetY = nextPos.y;
+             sidekick.startX = sidekick.x;
+             sidekick.startY = sidekick.y;
+             sidekick.dir = nextPos.dir;
+             sidekick.moveTimer = 0;
+             sidekick.legToggle = !sidekick.legToggle;
+         }
+      }
+    } else {
+      // Sidekick idle logic
+      if (!player.isMoving && performance.now() - lastIdleTime > 2000) {
+         if (sidekick.x < player.x) sidekick.dir = 'right';
+         else if (sidekick.x > player.x) sidekick.dir = 'left';
+         else if (sidekick.y < player.y) sidekick.dir = 'down';
+         else if (sidekick.y > player.y) sidekick.dir = 'up';
+      }
+
+      // Check if player moved ahead and sidekick needs to catch up
+      if (sidekick.queue.length > 0) {
+          const nextPos = sidekick.queue.shift();
+          sidekick.isMoving = true;
+          sidekick.state = 'walking';
+          sidekick.targetX = nextPos.x;
+          sidekick.targetY = nextPos.y;
+          sidekick.startX = sidekick.x;
+          sidekick.startY = sidekick.y;
+          sidekick.dir = nextPos.dir;
+          sidekick.moveTimer = 0;
+          sidekick.legToggle = !sidekick.legToggle;
+      }
     }
   }
 }
@@ -611,7 +691,7 @@ function updateParticles(dt) {
   for (let i = particles.length - 1; i >= 0; i--) {
     let p = particles[i];
     p.life -= dt / 1000;
-    p.y -= (dt / 1000) * 2;
+    p.y -= (dt / 1000) * 2; // Moves up logically in grid space slowly
     if (p.life <= 0) {
       particles.splice(i, 1);
     }
@@ -630,11 +710,9 @@ function getDirRow(dir) {
   }
 }
 
-// Map logical types to sprite assets
 function getAssetMapping(type) {
   if (TILE_MAP[type]) return TILE_MAP[type];
 
-  // Handle procedural obstacle anchors mapping
   if (type.includes('_small_obstacle')) {
      if (type.startsWith('forest')) return TILE_MAP.forest_small_tree;
      if (type.startsWith('desert')) return TILE_MAP.desert_rock;
@@ -651,12 +729,10 @@ function getAssetMapping(type) {
      if (type.startsWith('city')) return TILE_MAP.city_fountain;
   }
 
-  // Fallback
   return null;
 }
 
 function drawEntity(screenX, screenY, type, state, dir, frame) {
-  // If it's a character or pet
   if (['player', 'dog', 'cat'].includes(type)) {
     let img;
     if (type === 'player') {
@@ -669,17 +745,15 @@ function drawEntity(screenX, screenY, type, state, dir, frame) {
 
     if (img && img.complete && img.naturalWidth > 0) {
       const row = getDirRow(dir);
-      const col = frame; // 0, 1, 2
+      const col = frame;
       ctx.drawImage(img, col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE, screenX, screenY, TILE_SIZE, TILE_SIZE);
     } else {
-      // Fallback rect if image failed to load
       ctx.fillStyle = type === 'player' ? 'blue' : 'orange';
       ctx.fillRect(screenX + 24, screenY + 24, 48, 48);
     }
     return;
   }
 
-  // If it's an environment or obstacle tile
   const asset = getAssetMapping(type);
   if (asset) {
     const imgObj = images[asset.img];
@@ -688,7 +762,6 @@ function drawEntity(screenX, screenY, type, state, dir, frame) {
       const h = (asset.h || 1) * TILE_SIZE;
       ctx.drawImage(imgObj, asset.sx, asset.sy, w, h, screenX, screenY, w, h);
     } else {
-       // Fallback colors for missing assets
        if (type.includes('water')) ctx.fillStyle = 'blue';
        else if (type.includes('forest')) ctx.fillStyle = 'darkgreen';
        else if (type.includes('desert')) ctx.fillStyle = 'khaki';
@@ -703,21 +776,19 @@ function drawEntity(screenX, screenY, type, state, dir, frame) {
 }
 
 function render() {
-  // Fill background black
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  cameraX = player.x * TILE_SIZE - canvas.width / 2 + TILE_SIZE / 2;
-  cameraY = player.y * TILE_SIZE - canvas.height / 2 + TILE_SIZE / 2;
+  // Camera now follows player's pixel coordinates smoothly
+  cameraX = player.pixelX - canvas.width / 2 + TILE_SIZE / 2;
+  cameraY = player.pixelY - canvas.height / 2 + TILE_SIZE / 2;
 
-  // Draw World - Layer 1: Ground
   for (let key in activeTiles) {
     const tile = activeTiles[key];
     const [tx, ty] = key.split(',').map(Number);
     const screenX = tx * TILE_SIZE - cameraX;
     const screenY = ty * TILE_SIZE - cameraY;
 
-    // Draw base ground for the biome
     let baseType = tile.biome === 'forest' ? 'forest_grass' :
                    tile.biome === 'desert' ? 'desert_sand' :
                    tile.biome === 'city' ? 'city_pavement' : 'sea_water';
@@ -725,7 +796,6 @@ function render() {
     drawEntity(screenX, screenY, baseType, 'idle', 'down', 0);
   }
 
-  // Draw World - Layer 2: Obstacles (Anchors only, sorted by Y to support depth later)
   for (let key in activeTiles) {
     const tile = activeTiles[key];
     if (tile.type !== 'multi_part' && !tile.type.includes('grass') && !tile.type.includes('sand') && !tile.type.includes('pavement') && !tile.type.includes('water')) {
@@ -736,19 +806,16 @@ function render() {
     }
   }
 
-  // Draw Sidekick
   if (sidekick.active) {
-    const sx = sidekick.x * TILE_SIZE - cameraX;
-    const sy = sidekick.y * TILE_SIZE - cameraY;
+    const sx = sidekick.pixelX - cameraX;
+    const sy = sidekick.pixelY - cameraY;
     drawEntity(sx, sy, userProfile.petType.toLowerCase(), sidekick.state, sidekick.dir, sidekick.frame);
   }
 
-  // Draw Player
-  const px = player.x * TILE_SIZE - cameraX;
-  const py = player.y * TILE_SIZE - cameraY;
+  const px = player.pixelX - cameraX;
+  const py = player.pixelY - cameraY;
   drawEntity(px, py, 'player', player.state, player.dir, player.frame);
 
-  // Draw Particles
   ctx.font = 'bold 24px sans-serif';
   ctx.textAlign = 'center';
   for (let p of particles) {
@@ -771,7 +838,7 @@ function gameLoop(timestamp) {
   lastTime = timestamp;
 
   if (currentState === GAME_STATE.PLAYING) {
-    updatePlayer(dt);
+    updatePlayerAndSidekick(dt);
     updateWorld();
     updateParticles(dt);
   }
