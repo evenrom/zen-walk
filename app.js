@@ -765,7 +765,7 @@ function render() {
       const [tx, ty] = key.split(',').map(Number);
       const screenX = tx * TILE_SIZE - cameraX;
       const screenY = ty * TILE_SIZE - cameraY;
-      drawEntity(screenX, screenY, baseType, 'idle', 'down', 0, tx, ty);
+      drawEntity(screenX, screenY, tile.type, 'idle', 'down', 0, tx, ty);
     }
   }
 
