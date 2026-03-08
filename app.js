@@ -124,68 +124,52 @@ function initImages() {
 
 // --- Advanced TILE_MAP Dictionary (96x96 Grid) ---
 const TILE_MAP = {
-  // === BASE ENVIRONMENTS ===
-  forest_grass: [
-    { img: 'tileset_environment', sx: 0, sy: 0 },   // Col 0, Row 0
-    { img: 'tileset_environment', sx: 96, sy: 0 },  // Col 1, Row 0
-    { img: 'tileset_environment', sx: 192, sy: 0 }  // Col 2, Row 0
-  ],
-  desert_sand: [
-    { img: 'tileset_environment', sx: 0, sy: 96 },   // Col 0, Row 1
-    { img: 'tileset_environment', sx: 96, sy: 96 },  // Col 1, Row 1
-    { img: 'tileset_environment', sx: 192, sy: 96 }  // Col 2, Row 1
-  ],
-  city_pavement: [
-    { img: 'tileset_environment', sx: 0, sy: 192 },   // Col 0, Row 2
-    { img: 'tileset_environment', sx: 96, sy: 192 },  // Col 1, Row 2
-    { img: 'tileset_environment', sx: 192, sy: 192 }  // Col 2, Row 2
-  ],
-  sea_water: [
-    { img: 'tileset_environment', sx: 288, sy: 0 },   // Col 3, Row 0
-    { img: 'tileset_environment', sx: 288, sy: 96 },  // Col 3, Row 1
-    { img: 'tileset_environment', sx: 288, sy: 192 }  // Col 3, Row 2
-  ],
-
-  // === TRANSITIONS (AUTO-TILING) ===
-  // City to Desert
-  trans_city_desert_top_right:    { img: 'tileset_environment', sx: 0, sy: 384 },   // Col 0, Row 4
-  trans_city_desert_top:          { img: 'tileset_environment', sx: 0, sy: 480 },   // Col 0, Row 5
-  trans_city_desert_top_left:     { img: 'tileset_environment', sx: 0, sy: 576 },   // Col 0, Row 6
-  trans_city_desert_left:         { img: 'tileset_environment', sx: 96, sy: 576 },  // Col 1, Row 6
-  trans_city_desert_bottom_left:  { img: 'tileset_environment', sx: 192, sy: 576 }, // Col 2, Row 6
-  trans_city_desert_bottom:       { img: 'tileset_environment', sx: 192, sy: 480 }, // Col 2, Row 5
-  trans_city_desert_bottom_right: { img: 'tileset_environment', sx: 192, sy: 384 }, // Col 2, Row 4
-  trans_city_desert_right:        { img: 'tileset_environment', sx: 96, sy: 384 },  // Col 1, Row 4
-
-  // City to Forest
-  trans_city_forest_top_right:    { img: 'tileset_environment', sx: 0, sy: 672 },   // Col 0, Row 7
-  trans_city_forest_top:          { img: 'tileset_environment', sx: 0, sy: 768 },   // Col 0, Row 8
-  trans_city_forest_top_left:     { img: 'tileset_environment', sx: 0, sy: 864 },   // Col 0, Row 9
-  trans_city_forest_left:         { img: 'tileset_environment', sx: 96, sy: 864 },  // Col 1, Row 9
-  trans_city_forest_bottom_left:  { img: 'tileset_environment', sx: 192, sy: 864 }, // Col 2, Row 9
-  trans_city_forest_bottom:       { img: 'tileset_environment', sx: 192, sy: 768 }, // Col 2, Row 8
-  trans_city_forest_bottom_right: { img: 'tileset_environment', sx: 192, sy: 672 }, // Col 2, Row 7
-  trans_city_forest_right:        { img: 'tileset_environment', sx: 96, sy: 672 },  // Col 1, Row 7
-
-  // Forest to Desert
-  trans_forest_desert_top_right:    { img: 'tileset_environment', sx: 0, sy: 960 },   // Col 0, Row 10
-  trans_forest_desert_top:          { img: 'tileset_environment', sx: 0, sy: 1056 },  // Col 0, Row 11
-  trans_forest_desert_top_left:     { img: 'tileset_environment', sx: 0, sy: 1152 },  // Col 0, Row 12
-  trans_forest_desert_left:         { img: 'tileset_environment', sx: 96, sy: 1152 }, // Col 1, Row 12
-  trans_forest_desert_bottom_left:  { img: 'tileset_environment', sx: 192, sy: 1152 },// Col 2, Row 12
-  trans_forest_desert_bottom:       { img: 'tileset_environment', sx: 192, sy: 1056 },// Col 2, Row 11
-  trans_forest_desert_bottom_right: { img: 'tileset_environment', sx: 192, sy: 960 }, // Col 2, Row 10
-  trans_forest_desert_right:        { img: 'tileset_environment', sx: 96, sy: 960 },  // Col 1, Row 10
-
-  // Forest to Sea
-  trans_forest_sea_top_right:    { img: 'tileset_environment', sx: 0, sy: 1248 },  // Col 0, Row 13
-  trans_forest_sea_top:          { img: 'tileset_environment', sx: 0, sy: 1344 },  // Col 0, Row 14
-  trans_forest_sea_top_left:     { img: 'tileset_environment', sx: 0, sy: 1440 },  // Col 0, Row 15
-  trans_forest_sea_left:         { img: 'tileset_environment', sx: 96, sy: 1440 }, // Col 1, Row 15
-  trans_forest_sea_bottom_left:  { img: 'tileset_environment', sx: 192, sy: 1440 },// Col 2, Row 15
-  trans_forest_sea_bottom:       { img: 'tileset_environment', sx: 192, sy: 1344 },// Col 2, Row 14
-  trans_forest_sea_bottom_right: { img: 'tileset_environment', sx: 192, sy: 1248 },// Col 2, Row 13
-  trans_forest_sea_right:        { img: 'tileset_environment', sx: 96, sy: 1248 }, // Col 1, Row 13
+  forest: {
+    primary: { img: 'tileset_environment', sx: 96, sy: 96 },
+    secondary: { img: 'tileset_environment', sx: 192, sy: 96 },
+    edges: {
+      tl: { img: 'tileset_environment', sx: 0, sy: 0 },
+      t:  { img: 'tileset_environment', sx: 96, sy: 0 },
+      tr: { img: 'tileset_environment', sx: 288, sy: 0 },
+      r:  { img: 'tileset_environment', sx: 288, sy: 96 },
+      br: { img: 'tileset_environment', sx: 288, sy: 192 },
+      b:  { img: 'tileset_environment', sx: 96, sy: 192 },
+      bl: { img: 'tileset_environment', sx: 0, sy: 192 },
+      l:  { img: 'tileset_environment', sx: 0, sy: 96 }
+    }
+  },
+  desert: {
+    primary: { img: 'tileset_environment', sx: 480, sy: 96 },
+    secondary: { img: 'tileset_environment', sx: 576, sy: 96 },
+    edges: {
+      tl: { img: 'tileset_environment', sx: 384, sy: 0 },
+      t:  { img: 'tileset_environment', sx: 480, sy: 0 },
+      tr: { img: 'tileset_environment', sx: 672, sy: 0 },
+      r:  { img: 'tileset_environment', sx: 672, sy: 96 },
+      br: { img: 'tileset_environment', sx: 672, sy: 192 },
+      b:  { img: 'tileset_environment', sx: 480, sy: 192 },
+      bl: { img: 'tileset_environment', sx: 384, sy: 192 },
+      l:  { img: 'tileset_environment', sx: 384, sy: 96 }
+    }
+  },
+  city: {
+    primary: { img: 'tileset_environment', sx: 864, sy: 96 },
+    secondary: { img: 'tileset_environment', sx: 960, sy: 96 },
+    edges: {
+      tl: { img: 'tileset_environment', sx: 768, sy: 0 },
+      t:  { img: 'tileset_environment', sx: 864, sy: 0 },
+      tr: { img: 'tileset_environment', sx: 1056, sy: 0 },
+      r:  { img: 'tileset_environment', sx: 1056, sy: 96 },
+      br: { img: 'tileset_environment', sx: 1056, sy: 192 },
+      b:  { img: 'tileset_environment', sx: 864, sy: 192 },
+      bl: { img: 'tileset_environment', sx: 768, sy: 192 },
+      l:  { img: 'tileset_environment', sx: 768, sy: 96 }
+    }
+  },
+  sea: {
+    primary: { img: 'tileset_environment', sx: 1152, sy: 0 },
+    secondary: { img: 'tileset_environment', sx: 1152, sy: 96 }
+  },
 
   // === TEMPORARY OBSTACLE PLACEHOLDERS ===
   forest_small_obstacle: [{ img: 'tileset_obstacles', sx: 384, sy: 0, w: 1, h: 1 }],
