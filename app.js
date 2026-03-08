@@ -512,7 +512,7 @@ function updateWorld() {
   for (let key in activeTiles) {
     const [tx, ty] = key.split(',').map(Number);
     if (tx < minX - cullBuffer || tx > maxX + cullBuffer || ty < minY - cullBuffer || ty > maxY + cullBuffer) {
-       delete activeTiles[key];
+        delete activeTiles[key];
     }
   }
   
@@ -753,40 +753,43 @@ function getDirRow(dir) {
   }
 }
 
-function getAssetMapping(type, tx = 0, ty = 0) {
-  let assetGroup = TILE_MAP[type];
+function getAssetMapping(type, edgeType = 'center', isSecondary = false) {
+  // If it's a biome base tile
+  if (type.endsWith('_base') || type.includes('water')) {
+    const biome = type.split('_')[0];
+    
+    // If the new hierarchy is present in TILE_MAP (as described by user)
+    if (TILE_MAP[biome]) {
+       if (edgeType !== 'center' && TILE_MAP[biome].edges && TILE_MAP[biome].edges[edgeType]) {
+           return TILE_MAP[biome].edges[edgeType];
+       }
+       return TILE_MAP[biome][isSecondary ? 'secondary' : 'primary'];
+    }
+  }
   
-  if (!assetGroup) {
-      if (type.includes('_small_obstacle')) {
-         if (type.startsWith('forest')) assetGroup = TILE_MAP.forest_small_obstacle;
-         if (type.startsWith('desert')) assetGroup = TILE_MAP.desert_small_obstacle;
-         if (type.startsWith('city')) assetGroup = TILE_MAP.city_small_obstacle;
-      }
-      if (type.includes('_tall_obstacle_anchor')) {
-         if (type.startsWith('forest')) assetGroup = TILE_MAP.forest_tall_obstacle_anchor;
-         if (type.startsWith('desert')) assetGroup = TILE_MAP.desert_tall_obstacle_anchor;
-         if (type.startsWith('city')) assetGroup = TILE_MAP.city_tall_obstacle_anchor;
-      }
-      if (type.includes('_large_obstacle_anchor')) {
-         if (type.startsWith('forest')) assetGroup = TILE_MAP.forest_large_obstacle_anchor;
-         if (type.startsWith('desert')) assetGroup = TILE_MAP.desert_large_obstacle_anchor;
-         if (type.startsWith('city')) assetGroup = TILE_MAP.city_large_obstacle_anchor;
-      }
+  // Handle obstacle logic (unchanged fallback)
+  if (TILE_MAP[type]) return TILE_MAP[type];
+  
+  if (type.includes('_small_obstacle')) {
+     if (type.startsWith('forest')) return TILE_MAP.forest_small_obstacle[0];
+     if (type.startsWith('desert')) return TILE_MAP.desert_small_obstacle[0];
+     if (type.startsWith('city')) return TILE_MAP.city_small_obstacle[0];
   }
-
-  if (!assetGroup) return null;
-
-  // If it's an array of variations, pick one deterministically based on coordinates
-  if (Array.isArray(assetGroup)) {
-      const hash = pseudoRandom(tx * 3.14, ty * 2.71); 
-      const index = Math.floor(hash * assetGroup.length);
-      return assetGroup[index];
+  if (type.includes('_tall_obstacle_anchor')) {
+     if (type.startsWith('forest')) return TILE_MAP.forest_tall_obstacle_anchor[0];
+     if (type.startsWith('desert')) return TILE_MAP.desert_tall_obstacle_anchor[0];
+     if (type.startsWith('city')) return TILE_MAP.city_tall_obstacle_anchor[0];
   }
-
-  return assetGroup;
+  if (type.includes('_large_obstacle_anchor')) {
+     if (type.startsWith('forest')) return TILE_MAP.forest_large_obstacle_anchor[0];
+     if (type.startsWith('desert')) return TILE_MAP.desert_large_obstacle_anchor[0];
+     if (type.startsWith('city')) return TILE_MAP.city_large_obstacle_anchor[0];
+  }
+  
+  return null;
 }
 
-function drawEntity(screenX, screenY, type, state, dir, frame, tx = 0, ty = 0) {
+function drawEntity(screenX, screenY, type, state, dir, frame, edgeType = 'center', isSecondary = false) {
   if (['player', 'dog', 'cat'].includes(type)) {
     let img;
     if (type === 'player') {
@@ -808,7 +811,7 @@ function drawEntity(screenX, screenY, type, state, dir, frame, tx = 0, ty = 0) {
     return;
   }
   
-  const asset = getAssetMapping(type, tx, ty);
+  const asset = getAssetMapping(type, edgeType, isSecondary);
   if (asset) {
     const imgObj = images[asset.img];
     if (imgObj && imgObj.complete && imgObj.naturalWidth > 0) {
@@ -836,29 +839,60 @@ function render() {
   cameraX = player.pixelX - canvas.width / 2 + TILE_SIZE / 2;
   cameraY = player.pixelY - canvas.height / 2 + TILE_SIZE / 2;
   
+  // Layer 1: Auto-tiled Ground
   for (let key in activeTiles) {
     const tile = activeTiles[key];
     const [tx, ty] = key.split(',').map(Number);
     const screenX = tx * TILE_SIZE - cameraX;
     const screenY = ty * TILE_SIZE - cameraY;
     
-    let baseType = tile.biome === 'forest' ? 'forest_grass' : 
-                   tile.biome === 'desert' ? 'desert_sand' : 
-                   tile.biome === 'city' ? 'city_pavement' : 'sea_water';
-                   
-    drawEntity(screenX, screenY, baseType, 'idle', 'down', 0, tx, ty);
+    const myBiome = tile.biome;
+    let edgeType = 'center';
+    let isSecondary = false;
+    
+    if (myBiome === 'sea') {
+      isSecondary = pseudoRandom(tx * 0.45, ty * 0.45) > 0.75;
+    } else {
+      const topBiome = getBiome(tx, ty - 1);
+      const bottomBiome = getBiome(tx, ty + 1);
+      const leftBiome = getBiome(tx - 1, ty);
+      const rightBiome = getBiome(tx + 1, ty);
+      
+      const top = (topBiome !== myBiome);
+      const bottom = (bottomBiome !== myBiome);
+      const left = (leftBiome !== myBiome);
+      const right = (rightBiome !== myBiome);
+      
+      if (top && left) edgeType = 'tl';
+      else if (top && right) edgeType = 'tr';
+      else if (bottom && left) edgeType = 'bl';
+      else if (bottom && right) edgeType = 'br';
+      else if (top) edgeType = 't';
+      else if (bottom) edgeType = 'b';
+      else if (left) edgeType = 'l';
+      else if (right) edgeType = 'r';
+      else {
+        // Center tile clustering noise
+        isSecondary = pseudoRandom(tx * 0.45, ty * 0.45) > 0.75;
+      }
+    }
+    
+    let baseType = `${myBiome}_base`;
+    drawEntity(screenX, screenY, baseType, 'idle', 'down', 0, edgeType, isSecondary);
   }
   
+  // Layer 2: Obstacles
   for (let key in activeTiles) {
     const tile = activeTiles[key];
-    if (tile.type !== 'multi_part' && !tile.type.includes('grass') && !tile.type.includes('sand') && !tile.type.includes('pavement') && !tile.type.includes('water')) {
+    if (tile.type !== 'multi_part' && !tile.type.endsWith('_base') && !tile.type.includes('water')) {
       const [tx, ty] = key.split(',').map(Number);
       const screenX = tx * TILE_SIZE - cameraX;
       const screenY = ty * TILE_SIZE - cameraY;
-      drawEntity(screenX, screenY, tile.type, 'idle', 'down', 0, tx, ty);
+      drawEntity(screenX, screenY, tile.type, 'idle', 'down', 0);
     }
   }
   
+  // Entities
   if (sidekick.active) {
     const sx = sidekick.pixelX - cameraX;
     const sy = sidekick.pixelY - cameraY;
@@ -869,6 +903,7 @@ function render() {
   const py = player.pixelY - cameraY;
   drawEntity(px, py, 'player', player.state, player.dir, player.frame);
   
+  // Particles
   ctx.font = 'bold 24px sans-serif';
   ctx.textAlign = 'center';
   for (let p of particles) {
