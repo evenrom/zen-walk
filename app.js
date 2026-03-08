@@ -216,7 +216,7 @@ const TILE_MAP = {
   city_large_obstacle_anchor: [
     { img: 'tileset_obstacles', sx: 672, sy: 192, w: 2, h: 2 } // Storefront
   ]
-
+};
 
 // --- Initialization ---
 window.onload = () => {
