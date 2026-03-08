@@ -171,17 +171,51 @@ const TILE_MAP = {
     secondary: { img: 'tileset_environment', sx: 1152, sy: 96 }
   },
 
-  // === TEMPORARY OBSTACLE PLACEHOLDERS ===
-  forest_small_obstacle: [{ img: 'tileset_obstacles', sx: 384, sy: 0, w: 1, h: 1 }],
-  forest_tall_obstacle_anchor: [{ img: 'tileset_obstacles', sx: 0, sy: 384, w: 1, h: 2 }],
-  forest_large_obstacle_anchor: [{ img: 'tileset_obstacles', sx: 0, sy: 192, w: 2, h: 2 }],
-  desert_small_obstacle: [{ img: 'tileset_obstacles', sx: 480, sy: 96, w: 1, h: 1 }],
-  desert_tall_obstacle_anchor: [{ img: 'tileset_obstacles', sx: 96, sy: 384, w: 1, h: 2 }],
-  desert_large_obstacle_anchor: [{ img: 'tileset_obstacles', sx: 384, sy: 192, w: 2, h: 2 }],
-  city_small_obstacle: [{ img: 'tileset_obstacles', sx: 480, sy: 0, w: 1, h: 1 }],
-  city_tall_obstacle_anchor: [{ img: 'tileset_obstacles', sx: 192, sy: 384, w: 1, h: 2 }],
-  city_large_obstacle_anchor: [{ img: 'tileset_obstacles', sx: 576, sy: 384, w: 2, h: 2 }]
-};
+  // === OBSTACLES ===
+  // Forest
+  forest_small_obstacle: [
+    { img: 'tileset_obstacles', sx: 0, sy: 0, w: 1, h: 1 },    // Potted plant
+    { img: 'tileset_obstacles', sx: 0, sy: 96, w: 1, h: 1 },   // Round cactus
+    { img: 'tileset_obstacles', sx: 0, sy: 192, w: 1, h: 1 },  // Prickly pear
+    { img: 'tileset_obstacles', sx: 0, sy: 288, w: 1, h: 1 }   // Small rock
+  ],
+  forest_tall_obstacle_anchor: [
+    { img: 'tileset_obstacles', sx: 96, sy: 0, w: 1, h: 2 },   // Pine tree
+    { img: 'tileset_obstacles', sx: 192, sy: 0, w: 1, h: 2 }   // Oak tree
+  ],
+  forest_large_obstacle_anchor: [
+    { img: 'tileset_obstacles', sx: 96, sy: 192, w: 2, h: 2 }  // Giant Saguaro
+  ],
+  
+  // Desert
+  desert_small_obstacle: [
+    { img: 'tileset_obstacles', sx: 288, sy: 0, w: 1, h: 1 },  // Rock stack
+    { img: 'tileset_obstacles', sx: 288, sy: 96, w: 1, h: 1 }, // Water bowl
+    { img: 'tileset_obstacles', sx: 288, sy: 192, w: 1, h: 1 },// Sign
+    { img: 'tileset_obstacles', sx: 288, sy: 288, w: 1, h: 1 } // Red rock
+  ],
+  desert_tall_obstacle_anchor: [
+    { img: 'tileset_obstacles', sx: 384, sy: 0, w: 1, h: 2 },  // Totem
+    { img: 'tileset_obstacles', sx: 480, sy: 0, w: 1, h: 2 }   // Watchtower
+  ],
+  desert_large_obstacle_anchor: [
+    { img: 'tileset_obstacles', sx: 384, sy: 192, w: 2, h: 2 } // Mesa entrance
+  ],
+  
+  // City
+  city_small_obstacle: [
+    { img: 'tileset_obstacles', sx: 576, sy: 0, w: 1, h: 1 },  // Hydrant
+    { img: 'tileset_obstacles', sx: 576, sy: 96, w: 1, h: 1 }, // Mailbox
+    { img: 'tileset_obstacles', sx: 576, sy: 192, w: 1, h: 1 },// Signpost
+    { img: 'tileset_obstacles', sx: 576, sy: 288, w: 1, h: 1 } // Planter
+  ],
+  city_tall_obstacle_anchor: [
+    { img: 'tileset_obstacles', sx: 672, sy: 0, w: 1, h: 2 },  // Clock
+    { img: 'tileset_obstacles', sx: 768, sy: 0, w: 1, h: 2 }   // Power pole
+  ],
+  city_large_obstacle_anchor: [
+    { img: 'tileset_obstacles', sx: 672, sy: 192, w: 2, h: 2 } // Storefront
+  ]
 
 
 // --- Initialization ---
@@ -468,46 +502,51 @@ function generateTile(x, y) {
   
   const localNoise = pseudoRandom(x + 1000, y + 1000);
   
-  if (Math.abs(x) < 2 && Math.abs(y) < 2) return tileData;
+  // מניעת יצירת מכשולים על השחקן בתחילת המשחק
+  if (Math.abs(x) < 3 && Math.abs(y) < 3) return tileData;
   
-  if (localNoise < 0.10) {
-    tileData.type = `${biome}_large_obstacle_anchor`;
-    tileData.solid = true;
-    tileData.destructible = false;
+  // הסתברות של 2% בלבד לאובייקט - יוצר מרחק של כ-10-20 משבצות בין מכשולים
+  if (localNoise < 0.02) {
+    const typeNoise = pseudoRandom(x + 2000, y + 2000); // הגרלה נפרדת לסוג המכשול
     
-    activeTiles[getTileKey(x+1, y)] = { type: 'multi_part', biome: biome, destructible: false, solid: true, multiTileParent: getTileKey(x,y) };
-    activeTiles[getTileKey(x, y+1)] = { type: 'multi_part', biome: biome, destructible: false, solid: true, multiTileParent: getTileKey(x,y) };
-    activeTiles[getTileKey(x+1, y+1)] = { type: 'multi_part', biome: biome, destructible: false, solid: true, multiTileParent: getTileKey(x,y) };
-    
-  } else if (localNoise < 0.15) {
-    tileData.type = `${biome}_tall_obstacle_anchor`;
-    tileData.solid = true;
-    tileData.destructible = false;
-    
-    activeTiles[getTileKey(x, y+1)] = { type: 'multi_part', biome: biome, destructible: false, solid: true, multiTileParent: getTileKey(x,y) };
-    
-  } else if (localNoise < 0.30) {
-    tileData.type = `${biome}_small_obstacle`;
-    tileData.solid = true;
-    tileData.destructible = true;
+    if (typeNoise < 0.20) {
+      // 20% Large (2x2)
+      tileData.type = `${biome}_large_obstacle_anchor`;
+      tileData.solid = true;
+      tileData.destructible = false;
+      
+      activeTiles[getTileKey(x+1, y)] = { type: 'multi_part', biome: biome, destructible: false, solid: true, multiTileParent: getTileKey(x,y) };
+      activeTiles[getTileKey(x, y+1)] = { type: 'multi_part', biome: biome, destructible: false, solid: true, multiTileParent: getTileKey(x,y) };
+      activeTiles[getTileKey(x+1, y+1)] = { type: 'multi_part', biome: biome, destructible: false, solid: true, multiTileParent: getTileKey(x,y) };
+      
+    } else if (typeNoise < 0.50) {
+      // 30% Tall (1x2)
+      tileData.type = `${biome}_tall_obstacle_anchor`;
+      tileData.solid = true;
+      tileData.destructible = false;
+      
+      activeTiles[getTileKey(x, y+1)] = { type: 'multi_part', biome: biome, destructible: false, solid: true, multiTileParent: getTileKey(x,y) };
+      
+    } else {
+      // 50% Small (1x1)
+      tileData.type = `${biome}_small_obstacle`;
+      tileData.solid = true;
+      tileData.destructible = true;
+    }
   }
   
   return tileData;
 }
 
 function updateWorld() {
-  // Use a slightly larger radius for generating to prevent pop-in
   const viewRadiusX = Math.ceil(canvas.width / 2 / TILE_SIZE) + OFF_SCREEN_BUFFER;
   const viewRadiusY = Math.ceil(canvas.height / 2 / TILE_SIZE) + OFF_SCREEN_BUFFER;
   
-  // Use current logical x, y to calculate center of generation
   const minX = player.x - viewRadiusX;
   const maxX = player.x + viewRadiusX;
   const minY = player.y - viewRadiusY;
   const maxY = player.y + viewRadiusY;
   
-  // 1. Cull off-screen tiles (Amnesia)
-  // Ensure we don't cull tiles we just generated or are about to generate
   const cullBuffer = 3; 
   for (let key in activeTiles) {
     const [tx, ty] = key.split(',').map(Number);
@@ -516,7 +555,6 @@ function updateWorld() {
     }
   }
   
-  // 2. Generate missing tiles
   for (let y = minY; y <= maxY; y++) {
     for (let x = minX; x <= maxX; x++) {
       const key = getTileKey(x, y);
@@ -574,24 +612,17 @@ function moveEntity(entity, dt) {
   let t = entity.moveTimer / MOVE_DURATION;
   
   if (t >= 1.0) {
-    // Finish movement
     entity.pixelX = entity.targetX * TILE_SIZE;
     entity.pixelY = entity.targetY * TILE_SIZE;
     entity.x = entity.targetX;
     entity.y = entity.targetY;
     entity.isMoving = false;
     entity.moveTimer = 0;
-    
-    // Snap to idle frame if not immediately starting another move later
     entity.frame = 1;
-    
-    return true; // Finished
+    return true; 
   } else {
-    // Interpolate
     entity.pixelX = lerp(entity.startX * TILE_SIZE, entity.targetX * TILE_SIZE, t);
     entity.pixelY = lerp(entity.startY * TILE_SIZE, entity.targetY * TILE_SIZE, t);
-    
-    // Lock animation frame while moving
     entity.frame = entity.legToggle ? 2 : 0;
     return false;
   }
@@ -619,19 +650,16 @@ function tryStartPlayerMove() {
     const tile = activeTiles[key];
     
     if (isSolid(tile)) {
-      // Bumping into wall
       player.state = 'idle';
       player.frame = 1;
       soundThud();
-      // Add a small cooldown even if we failed so we don't spam thud
       player.isMoving = true;
       player.targetX = player.x;
       player.targetY = player.y;
       player.startX = player.x;
       player.startY = player.y;
-      player.moveTimer = MOVE_DURATION / 2; // Shorter lock for a bump
+      player.moveTimer = MOVE_DURATION / 2; 
     } else {
-      // Start moving
       player.isMoving = true;
       player.state = 'walking';
       player.targetX = targetX;
@@ -641,13 +669,11 @@ function tryStartPlayerMove() {
       player.moveTimer = 0;
       player.legToggle = !player.legToggle;
       
-      // Queue sidekick move immediately when player commits to a step
       if (sidekick.active) {
         sidekick.queue.push({x: player.x, y: player.y, dir: player.dir});
       }
     }
   } else {
-    // Not pressing movement keys
     player.state = 'idle';
     player.frame = 1;
   }
@@ -656,11 +682,9 @@ function tryStartPlayerMove() {
 function updatePlayerAndSidekick(dt) {
   if (player.isMoving) {
     if (moveEntity(player, dt)) {
-      // Movement finished this frame
       incrementStep();
       lastIdleTime = performance.now();
       
-      // Start sidekick movement if it has something queued and isn't already moving
       if (sidekick.active && !sidekick.isMoving && sidekick.queue.length > 0) {
          const nextPos = sidekick.queue.shift();
          sidekick.isMoving = true;
@@ -671,7 +695,7 @@ function updatePlayerAndSidekick(dt) {
          sidekick.startY = sidekick.y;
          sidekick.dir = nextPos.dir;
          sidekick.moveTimer = 0;
-         sidekick.legToggle = player.legToggle; // Match player leg for sync
+         sidekick.legToggle = player.legToggle;
       }
     }
   } else {
@@ -681,8 +705,6 @@ function updatePlayerAndSidekick(dt) {
   if (sidekick.active) {
     if (sidekick.isMoving) {
       if(moveEntity(sidekick, dt)) {
-         // Sidekick finished moving
-         // If there's MORE in the queue (e.g. player moved fast), start next immediately
          if (sidekick.queue.length > 0 && !player.isMoving) {
              const nextPos = sidekick.queue.shift();
              sidekick.isMoving = true;
@@ -696,7 +718,6 @@ function updatePlayerAndSidekick(dt) {
          }
       }
     } else {
-      // Sidekick idle logic
       if (!player.isMoving && performance.now() - lastIdleTime > 2000) {
          if (sidekick.x < player.x) sidekick.dir = 'right';
          else if (sidekick.x > player.x) sidekick.dir = 'left';
@@ -704,7 +725,6 @@ function updatePlayerAndSidekick(dt) {
          else if (sidekick.y > player.y) sidekick.dir = 'up';
       }
       
-      // Check if player moved ahead and sidekick needs to catch up
       if (sidekick.queue.length > 0) {
           const nextPos = sidekick.queue.shift();
           sidekick.isMoving = true;
@@ -722,22 +742,15 @@ function updatePlayerAndSidekick(dt) {
 }
 
 function spawnParticle(x, y, text, color) {
-  particles.push({
-    x: x, y: y,
-    text: text,
-    color: color,
-    life: 1.0
-  });
+  particles.push({ x: x, y: y, text: text, color: color, life: 1.0 });
 }
 
 function updateParticles(dt) {
   for (let i = particles.length - 1; i >= 0; i--) {
     let p = particles[i];
     p.life -= dt / 1000;
-    p.y -= (dt / 1000) * 2; // Moves up logically in grid space slowly
-    if (p.life <= 0) {
-      particles.splice(i, 1);
-    }
+    p.y -= (dt / 1000) * 2;
+    if (p.life <= 0) particles.splice(i, 1);
   }
 }
 
@@ -753,12 +766,9 @@ function getDirRow(dir) {
   }
 }
 
-function getAssetMapping(type, edgeType = 'center', isSecondary = false) {
-  // If it's a biome base tile
+function getAssetMapping(type, edgeType = 'center', isSecondary = false, tx = 0, ty = 0) {
   if (type.endsWith('_base') || type.includes('water')) {
     const biome = type.split('_')[0];
-    
-    // If the new hierarchy is present in TILE_MAP (as described by user)
     if (TILE_MAP[biome]) {
        if (edgeType !== 'center' && TILE_MAP[biome].edges && TILE_MAP[biome].edges[edgeType]) {
            return TILE_MAP[biome].edges[edgeType];
@@ -767,67 +777,54 @@ function getAssetMapping(type, edgeType = 'center', isSecondary = false) {
     }
   }
   
-  // Handle obstacle logic (unchanged fallback)
-  if (TILE_MAP[type]) return TILE_MAP[type];
-  
-  if (type.includes('_small_obstacle')) {
-     if (type.startsWith('forest')) return TILE_MAP.forest_small_obstacle[0];
-     if (type.startsWith('desert')) return TILE_MAP.desert_small_obstacle[0];
-     if (type.startsWith('city')) return TILE_MAP.city_small_obstacle[0];
-  }
-  if (type.includes('_tall_obstacle_anchor')) {
-     if (type.startsWith('forest')) return TILE_MAP.forest_tall_obstacle_anchor[0];
-     if (type.startsWith('desert')) return TILE_MAP.desert_tall_obstacle_anchor[0];
-     if (type.startsWith('city')) return TILE_MAP.city_tall_obstacle_anchor[0];
-  }
-  if (type.includes('_large_obstacle_anchor')) {
-     if (type.startsWith('forest')) return TILE_MAP.forest_large_obstacle_anchor[0];
-     if (type.startsWith('desert')) return TILE_MAP.desert_large_obstacle_anchor[0];
-     if (type.startsWith('city')) return TILE_MAP.city_large_obstacle_anchor[0];
+  let assetGroup = null;
+  if (TILE_MAP[type]) {
+      assetGroup = TILE_MAP[type];
+  } else if (type.includes('_small_obstacle')) {
+     if (type.startsWith('forest')) assetGroup = TILE_MAP.forest_small_obstacle;
+     else if (type.startsWith('desert')) assetGroup = TILE_MAP.desert_small_obstacle;
+     else if (type.startsWith('city')) assetGroup = TILE_MAP.city_small_obstacle;
+  } else if (type.includes('_tall_obstacle_anchor')) {
+     if (type.startsWith('forest')) assetGroup = TILE_MAP.forest_tall_obstacle_anchor;
+     else if (type.startsWith('desert')) assetGroup = TILE_MAP.desert_tall_obstacle_anchor;
+     else if (type.startsWith('city')) assetGroup = TILE_MAP.city_tall_obstacle_anchor;
+  } else if (type.includes('_large_obstacle_anchor')) {
+     if (type.startsWith('forest')) assetGroup = TILE_MAP.forest_large_obstacle_anchor;
+     else if (type.startsWith('desert')) assetGroup = TILE_MAP.desert_large_obstacle_anchor;
+     else if (type.startsWith('city')) assetGroup = TILE_MAP.city_large_obstacle_anchor;
   }
   
-  return null;
+  // שולף תמונה רנדומלית-קבועה מתוך המערך בהתבסס על הקואורדינטות
+  if (Array.isArray(assetGroup)) {
+      const hash = pseudoRandom(tx * 3.14, ty * 2.71); 
+      const index = Math.floor(hash * assetGroup.length);
+      return assetGroup[index];
+  }
+  
+  return assetGroup || null;
 }
 
-function drawEntity(screenX, screenY, type, state, dir, frame, edgeType = 'center', isSecondary = false) {
+function drawEntity(screenX, screenY, type, state, dir, frame, edgeType = 'center', isSecondary = false, tx = 0, ty = 0) {
   if (['player', 'dog', 'cat'].includes(type)) {
     let img;
-    if (type === 'player') {
-      img = images[`player_${userProfile.gender}`] || images.player_Female;
-    } else if (type === 'dog') {
-      img = images.pet_Dog;
-    } else if (type === 'cat') {
-      img = images.pet_Cat;
-    }
+    if (type === 'player') img = images[`player_${userProfile.gender}`] || images.player_Female;
+    else if (type === 'dog') img = images.pet_Dog;
+    else if (type === 'cat') img = images.pet_Cat;
     
     if (img && img.complete && img.naturalWidth > 0) {
       const row = getDirRow(dir);
-      const col = frame;
-      ctx.drawImage(img, col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE, screenX, screenY, TILE_SIZE, TILE_SIZE);
-    } else {
-      ctx.fillStyle = type === 'player' ? 'blue' : 'orange';
-      ctx.fillRect(screenX + 24, screenY + 24, 48, 48);
+      ctx.drawImage(img, frame * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE, screenX, screenY, TILE_SIZE, TILE_SIZE);
     }
     return;
   }
   
-  const asset = getAssetMapping(type, edgeType, isSecondary);
+  const asset = getAssetMapping(type, edgeType, isSecondary, tx, ty);
   if (asset) {
     const imgObj = images[asset.img];
     if (imgObj && imgObj.complete && imgObj.naturalWidth > 0) {
       const w = (asset.w || 1) * TILE_SIZE;
       const h = (asset.h || 1) * TILE_SIZE;
       ctx.drawImage(imgObj, asset.sx, asset.sy, w, h, screenX, screenY, w, h);
-    } else {
-       if (type.includes('water')) ctx.fillStyle = 'blue';
-       else if (type.includes('forest')) ctx.fillStyle = 'darkgreen';
-       else if (type.includes('desert')) ctx.fillStyle = 'khaki';
-       else if (type.includes('city')) ctx.fillStyle = 'gray';
-       else ctx.fillStyle = 'purple';
-       
-       const w = (asset.w || 1) * TILE_SIZE;
-       const h = (asset.h || 1) * TILE_SIZE;
-       ctx.fillRect(screenX, screenY, w, h);
     }
   }
 }
@@ -839,7 +836,6 @@ function render() {
   cameraX = player.pixelX - canvas.width / 2 + TILE_SIZE / 2;
   cameraY = player.pixelY - canvas.height / 2 + TILE_SIZE / 2;
   
-  // Layer 1: Auto-tiled Ground
   for (let key in activeTiles) {
     const tile = activeTiles[key];
     const [tx, ty] = key.split(',').map(Number);
@@ -872,27 +868,24 @@ function render() {
       else if (left) edgeType = 'l';
       else if (right) edgeType = 'r';
       else {
-        // Center tile clustering noise
         isSecondary = pseudoRandom(tx * 0.45, ty * 0.45) > 0.75;
       }
     }
     
     let baseType = `${myBiome}_base`;
-    drawEntity(screenX, screenY, baseType, 'idle', 'down', 0, edgeType, isSecondary);
+    drawEntity(screenX, screenY, baseType, 'idle', 'down', 0, edgeType, isSecondary, tx, ty);
   }
   
-  // Layer 2: Obstacles
   for (let key in activeTiles) {
     const tile = activeTiles[key];
     if (tile.type !== 'multi_part' && !tile.type.endsWith('_base') && !tile.type.includes('water')) {
       const [tx, ty] = key.split(',').map(Number);
       const screenX = tx * TILE_SIZE - cameraX;
       const screenY = ty * TILE_SIZE - cameraY;
-      drawEntity(screenX, screenY, tile.type, 'idle', 'down', 0);
+      drawEntity(screenX, screenY, tile.type, 'idle', 'down', 0, 'center', false, tx, ty);
     }
   }
   
-  // Entities
   if (sidekick.active) {
     const sx = sidekick.pixelX - cameraX;
     const sy = sidekick.pixelY - cameraY;
@@ -903,7 +896,6 @@ function render() {
   const py = player.pixelY - cameraY;
   drawEntity(px, py, 'player', player.state, player.dir, player.frame);
   
-  // Particles
   ctx.font = 'bold 24px sans-serif';
   ctx.textAlign = 'center';
   for (let p of particles) {
