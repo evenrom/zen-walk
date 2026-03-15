@@ -512,8 +512,12 @@ function incrementStep() {
 
 function updateDayNightCycle() {
   const overlay = document.getElementById('dayNightOverlay');
-  const cycle = Math.floor(gameStats.totalSteps / 1000) % 2;
-  if (cycle === 1) {
+  if (!overlay) return;
+  
+  // מחזור של 1000 צעדים: 0-700 זה יום, 701-999 זה לילה.
+  const cyclePos = gameStats.totalSteps % 1000;
+  
+  if (cyclePos > 700) {
     overlay.classList.add('night');
   } else {
     overlay.classList.remove('night');
@@ -803,15 +807,25 @@ function tryStartPlayerMove() {
 }
 
 function updateSidekickDog(dt) {
+  // 1. Anti-Stuck Teleport Protocol
+  const distToPlayer = Math.abs(player.x - sidekick.x) + Math.abs(player.y - sidekick.y);
+  if (distToPlayer > 12) {
+     sidekick.x = player.x; sidekick.y = player.y;
+     sidekick.pixelX = player.x * TILE_SIZE; sidekick.pixelY = player.y * TILE_SIZE;
+     sidekick.fsmState = 'follow'; sidekick.seekTarget = null;
+     sidekick.queue = []; sidekick.isMoving = false;
+     return;
+  }
+
+  // 2. Dynamic Speed (Catch-up mechanic)
+  const modifiedDt = sidekick.queue.length > 3 ? dt * 1.5 : dt;
+
   if (sidekick.isMoving) {
-    if(moveEntity(sidekick, dt)) {
+    if(moveEntity(sidekick, modifiedDt)) {
       if (sidekick.fsmState === 'seek' && sidekick.seekTarget) {
-        // Did we reach next to it?
         const dist = Math.abs(sidekick.x - sidekick.seekTarget.x) + Math.abs(sidekick.y - sidekick.seekTarget.y);
         if (dist <= 1) {
-          sidekick.fsmState = 'sit';
-          sidekick.state = 'idle';
-          sidekick.frame = 1;
+          sidekick.fsmState = 'sit'; sidekick.state = 'idle'; sidekick.frame = 1;
           if (sidekick.x < sidekick.seekTarget.x) sidekick.dir = 'right';
           else if (sidekick.x > sidekick.seekTarget.x) sidekick.dir = 'left';
           else if (sidekick.y < sidekick.seekTarget.y) sidekick.dir = 'down';
@@ -820,156 +834,111 @@ function updateSidekickDog(dt) {
       }
     }
   } else {
-    // If sitting, check if player moved too far or item collected
     if (sidekick.fsmState === 'sit') {
        const key = getTileKey(sidekick.seekTarget.x, sidekick.seekTarget.y);
        const targetTile = activeTiles[key];
-       const playerDist = Math.abs(player.x - sidekick.x) + Math.abs(player.y - sidekick.y);
-
-       if (!targetTile || !targetTile.destructible || playerDist > 12) {
-         sidekick.fsmState = 'follow';
-         sidekick.seekTarget = null;
-         sidekick.queue = []; // Reset queue
-       } else {
-         return; // Just sit
-       }
+       if (!targetTile || !targetTile.destructible || distToPlayer > 8) {
+         sidekick.fsmState = 'follow'; sidekick.seekTarget = null; sidekick.queue = [];
+       } else { return; }
     }
 
-    // Check if we can seek
-    if (sidekick.fsmState === 'follow' && !player.isMoving) {
-      if (Math.random() < 0.05) { // Scan occasionally
-         let found = null;
-         let minDist = 100;
-         for (let x = player.x - 10; x <= player.x + 10; x++) {
-           for (let y = player.y - 10; y <= player.y + 10; y++) {
-              const key = getTileKey(x, y);
-              const tile = activeTiles[key];
-              if (tile && tile.destructible) {
-                 const dist = Math.abs(sidekick.x - x) + Math.abs(sidekick.y - y);
-                 if (dist < minDist) {
-                    minDist = dist;
-                    found = {x, y};
-                 }
-              }
-           }
+    if (sidekick.fsmState === 'follow' && !player.isMoving && Math.random() < 0.05) {
+       let found = null; let minDist = 100;
+       for (let x = player.x - 10; x <= player.x + 10; x++) {
+         for (let y = player.y - 10; y <= player.y + 10; y++) {
+            const tile = activeTiles[getTileKey(x, y)];
+            if (tile && tile.destructible) {
+               const dist = Math.abs(sidekick.x - x) + Math.abs(sidekick.y - y);
+               if (dist < minDist) { minDist = dist; found = {x, y}; }
+            }
          }
-         if (found) {
-            sidekick.fsmState = 'seek';
-            sidekick.seekTarget = found;
-            sidekick.queue = []; // Stop following player
-         }
-      }
+       }
+       if (found) { sidekick.fsmState = 'seek'; sidekick.seekTarget = found; sidekick.queue = []; }
     }
 
     if (sidekick.fsmState === 'seek' && sidekick.seekTarget) {
-       // Simple pathing towards target
        let dx = 0; let dy = 0;
-       if (sidekick.x < sidekick.seekTarget.x) dx = 1;
-       else if (sidekick.x > sidekick.seekTarget.x) dx = -1;
-       else if (sidekick.y < sidekick.seekTarget.y) dy = 1;
-       else if (sidekick.y > sidekick.seekTarget.y) dy = -1;
+       if (sidekick.x < sidekick.seekTarget.x) dx = 1; else if (sidekick.x > sidekick.seekTarget.x) dx = -1;
+       else if (sidekick.y < sidekick.seekTarget.y) dy = 1; else if (sidekick.y > sidekick.seekTarget.y) dy = -1;
 
-       const nextX = sidekick.x + dx;
-       const nextY = sidekick.y + dy;
-       const distToTarget = Math.abs(nextX - sidekick.seekTarget.x) + Math.abs(nextY - sidekick.seekTarget.y);
-
-       if (distToTarget === 0) { // Don't walk ON the object
-          sidekick.fsmState = 'sit';
-          return;
+       const nextX = sidekick.x + dx; const nextY = sidekick.y + dy;
+       if (Math.abs(nextX - sidekick.seekTarget.x) + Math.abs(nextY - sidekick.seekTarget.y) === 0) {
+          sidekick.fsmState = 'sit'; return;
        }
 
-       const key = getTileKey(nextX, nextY);
-       const tile = activeTiles[key];
+       const tile = activeTiles[getTileKey(nextX, nextY)];
        if (!tile || !tile.solid) {
-         sidekick.isMoving = true;
-         sidekick.state = 'walking';
-         sidekick.targetX = nextX;
-         sidekick.targetY = nextY;
-         sidekick.startX = sidekick.x;
-         sidekick.startY = sidekick.y;
+         sidekick.isMoving = true; sidekick.state = 'walking';
+         sidekick.targetX = nextX; sidekick.targetY = nextY;
+         sidekick.startX = sidekick.x; sidekick.startY = sidekick.y;
          sidekick.dir = dx > 0 ? 'right' : dx < 0 ? 'left' : dy > 0 ? 'down' : 'up';
-         sidekick.moveTimer = 0;
-         sidekick.legToggle = !sidekick.legToggle;
-       } else {
-         sidekick.fsmState = 'sit'; // Stuck, just sit
-       }
+         sidekick.moveTimer = 0; sidekick.legToggle = !sidekick.legToggle;
+       } else { sidekick.fsmState = 'sit'; }
        return;
     }
 
-    // Follow logic
-    if (sidekick.fsmState === 'follow' && sidekick.queue.length > 0) {
+    // FIX: Keep 1 tile behind by checking queue.length > 1
+    if (sidekick.fsmState === 'follow' && sidekick.queue.length > 1) {
         const nextPos = sidekick.queue.shift();
-        sidekick.isMoving = true;
-        sidekick.state = 'walking';
-        sidekick.targetX = nextPos.x;
-        sidekick.targetY = nextPos.y;
-        sidekick.startX = sidekick.x;
-        sidekick.startY = sidekick.y;
-        sidekick.dir = nextPos.dir;
-        sidekick.moveTimer = 0;
+        sidekick.isMoving = true; sidekick.state = 'walking';
+        sidekick.targetX = nextPos.x; sidekick.targetY = nextPos.y;
+        sidekick.startX = sidekick.x; sidekick.startY = sidekick.y;
+        sidekick.dir = nextPos.dir; sidekick.moveTimer = 0;
         sidekick.legToggle = !sidekick.legToggle;
-    } else if (sidekick.fsmState === 'follow') {
-      if (!player.isMoving && performance.now() - lastIdleTime > 2000) {
-         if (sidekick.x < player.x) sidekick.dir = 'right';
-         else if (sidekick.x > player.x) sidekick.dir = 'left';
-         else if (sidekick.y < player.y) sidekick.dir = 'down';
-         else if (sidekick.y > player.y) sidekick.dir = 'up';
-      }
+    } else if (sidekick.fsmState === 'follow' && !player.isMoving && performance.now() - lastIdleTime > 2000) {
+        if (sidekick.x < player.x) sidekick.dir = 'right'; else if (sidekick.x > player.x) sidekick.dir = 'left';
+        else if (sidekick.y < player.y) sidekick.dir = 'down'; else if (sidekick.y > player.y) sidekick.dir = 'up';
     }
   }
 }
 
 function updateSidekickCat(dt) {
+  // 1. Anti-Stuck Teleport Protocol
+  const distToPlayer = Math.abs(player.x - sidekick.x) + Math.abs(player.y - sidekick.y);
+  if (distToPlayer > 12) {
+     sidekick.x = player.x; sidekick.y = player.y;
+     sidekick.pixelX = player.x * TILE_SIZE; sidekick.pixelY = player.y * TILE_SIZE;
+     sidekick.fsmState = 'follow'; sidekick.idleTimer = 0;
+     sidekick.queue = []; sidekick.isMoving = false;
+     return;
+  }
+
+  // 2. Dynamic Speed (Catch-up mechanic)
+  const modifiedDt = sidekick.queue.length > 3 ? dt * 1.5 : dt;
+
   if (sidekick.isMoving) {
-    if(moveEntity(sidekick, dt)) {
-      // Finished moving
-    }
+    moveEntity(sidekick, modifiedDt);
   } else {
     if (sidekick.fsmState === 'idle') {
-       sidekick.idleTimer -= dt;
-       sidekick.state = 'idle';
-       // Check proximity
-       const dist = Math.abs(player.x - sidekick.x) + Math.abs(player.y - sidekick.y);
-       if (dist <= 1) {
+       sidekick.idleTimer -= dt; sidekick.state = 'idle';
+       if (distToPlayer <= 1) {
           gameStats.hiddenCatBonus++;
           spawnParticle(sidekick.x, sidekick.y - 1, "♥️", '#FF69B4');
-          soundCut();
-          saveLocalData();
-          sidekick.fsmState = 'follow'; // Stop idling once bonus is claimed
-          sidekick.idleTimer = 0;
-       } else if (sidekick.idleTimer <= 0) {
-         sidekick.fsmState = 'follow';
-       }
+          soundCut(); saveLocalData();
+          sidekick.fsmState = 'follow'; sidekick.idleTimer = 0;
+       } else if (sidekick.idleTimer <= 0) { sidekick.fsmState = 'follow'; }
        return;
     }
 
     if (sidekick.fsmState === 'follow') {
-       if (Math.random() < 0.005) { // Random chance to start idling
+       if (Math.random() < 0.005) {
           sidekick.fsmState = 'idle';
-          sidekick.idleTimer = 5000 + Math.random() * 5000; // Idle for 5-10 seconds
-          sidekick.queue = [];
-          return;
+          sidekick.idleTimer = 5000 + Math.random() * 5000;
+          sidekick.queue = []; return;
        }
 
-       if (sidekick.queue.length > 0) {
+       // FIX: Keep 1 tile behind by checking queue.length > 1
+       if (sidekick.queue.length > 1) {
           const nextPos = sidekick.queue.shift();
-          sidekick.isMoving = true;
-          sidekick.state = 'walking';
-          sidekick.targetX = nextPos.x;
-          sidekick.targetY = nextPos.y;
-          sidekick.startX = sidekick.x;
-          sidekick.startY = sidekick.y;
-          sidekick.dir = nextPos.dir;
-          sidekick.moveTimer = 0;
+          sidekick.isMoving = true; sidekick.state = 'walking';
+          sidekick.targetX = nextPos.x; sidekick.targetY = nextPos.y;
+          sidekick.startX = sidekick.x; sidekick.startY = sidekick.y;
+          sidekick.dir = nextPos.dir; sidekick.moveTimer = 0;
           sidekick.legToggle = !sidekick.legToggle;
-      } else {
-        if (!player.isMoving && performance.now() - lastIdleTime > 2000) {
-           if (sidekick.x < player.x) sidekick.dir = 'right';
-           else if (sidekick.x > player.x) sidekick.dir = 'left';
-           else if (sidekick.y < player.y) sidekick.dir = 'down';
-           else if (sidekick.y > player.y) sidekick.dir = 'up';
-        }
-      }
+       } else if (!player.isMoving && performance.now() - lastIdleTime > 2000) {
+          if (sidekick.x < player.x) sidekick.dir = 'right'; else if (sidekick.x > player.x) sidekick.dir = 'left';
+          else if (sidekick.y < player.y) sidekick.dir = 'down'; else if (sidekick.y > player.y) sidekick.dir = 'up';
+       }
     }
   }
 }
