@@ -12,6 +12,12 @@
   <!-- Full-screen Canvas -->
   <canvas id="gameCanvas"></canvas>
 
+  <!-- Day/Night Overlay -->
+  <div id="dayNightOverlay"></div>
+
+  <!-- Minimap -->
+  <canvas id="minimap"></canvas>
+
   <!-- Start Screen Overlay -->
   <div id="startScreen" class="overlay">
     <div class="modal">
@@ -21,6 +27,11 @@
       <div class="input-group">
         <label for="username">Username:</label>
         <input type="text" id="username" placeholder="Enter username" required>
+      </div>
+
+      <div class="input-group">
+        <label for="pin">PIN:</label>
+        <input type="password" id="pin" placeholder="4-digit PIN" maxlength="4" pattern="\d{4}" required>
       </div>
 
       <div class="input-group">
@@ -60,14 +71,14 @@
   <!-- Virtual Gamepad Overlay -->
   <div id="gamepad" class="hidden">
     <div class="d-pad">
-      <button class="d-btn up" id="btnUp"></button>
-      <button class="d-btn left" id="btnLeft"></button>
-      <button class="d-btn right" id="btnRight"></button>
-      <button class="d-btn down" id="btnDown"></button>
+      <button class="d-btn up" id="btnUp" aria-label="Up"></button>
+      <button class="d-btn left" id="btnLeft" aria-label="Left"></button>
+      <button class="d-btn right" id="btnRight" aria-label="Right"></button>
+      <button class="d-btn down" id="btnDown" aria-label="Down"></button>
     </div>
     <div class="action-buttons">
-      <button class="a-btn" id="btnB">B</button>
-      <button class="a-btn" id="btnA">A</button>
+      <button class="a-btn" id="btnB" aria-label="Button B - Pause and Stats">B</button>
+      <button class="a-btn" id="btnA" aria-label="Button A - Collect Object">A</button>
     </div>
   </div>
 

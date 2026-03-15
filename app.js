@@ -17,14 +17,19 @@ let cameraX = 0, cameraY = 0;
 
 // User Data
 let userProfile = {
+  playerID: "",
   username: "",
+  pin: "",
   gender: "",
   petType: "None"
 };
 
 let gameStats = {
   totalSteps: 0,
-  destroyedElements: {}
+  forestTreasures: 0,
+  urbanArtifacts: 0,
+  desertRelics: 0,
+  hiddenCatBonus: 0
 };
 
 // Sync Logic
@@ -55,7 +60,10 @@ let sidekick = {
   startX: 0, startY: 0,
   dir: 'down', state: 'idle', frame: 1, 
   active: false, isMoving: false, moveTimer: 0,
-  queue: [] // Holds {x, y, dir} of player's previous grid positions
+  queue: [], // Holds {x, y, dir} of player's previous grid positions
+  fsmState: 'follow', // follow, seek, idle
+  seekTarget: null,
+  idleTimer: 0
 };
 
 let particles = [];
@@ -231,6 +239,7 @@ window.onload = () => {
   initImages();
   setupDOM();
   setupControls();
+  initMinimap();
   
   loadLocalData();
   
@@ -251,17 +260,27 @@ function resizeCanvas() {
 
 function setupDOM() {
   const startBtn = document.getElementById('startBtn');
-  startBtn.addEventListener('click', () => {
+  startBtn.addEventListener('click', async () => {
     if (startBtn.disabled) return;
     
     const usernameInput = document.getElementById('username').value.trim();
-    if (!usernameInput) {
-      alert("Please enter a username.");
+    const pinInput = document.getElementById('pin').value.trim();
+
+    if (!usernameInput || !pinInput || pinInput.length !== 4) {
+      alert("Please enter a username and a 4-digit PIN.");
       return;
     }
+
+    startBtn.disabled = true;
+    startBtn.textContent = "Loading Data...";
+
     userProfile.username = usernameInput;
+    userProfile.pin = pinInput;
+    userProfile.playerID = usernameInput.toLowerCase() + "_" + pinInput;
     userProfile.gender = document.getElementById('gender').value;
     userProfile.petType = document.getElementById('petType').value;
+
+    await loadServerData(userProfile.playerID);
     
     document.getElementById('startScreen').classList.add('hidden');
     document.getElementById('gamepad').classList.remove('hidden');
@@ -312,10 +331,19 @@ function updateStatsUI() {
   document.getElementById('totalSteps').textContent = gameStats.totalSteps;
   const list = document.getElementById('destroyedElementsList');
   list.innerHTML = "";
-  for (const [key, value] of Object.entries(gameStats.destroyedElements)) {
-    const p = document.createElement('p');
-    p.textContent = `${key}: ${value}`;
-    list.appendChild(p);
+
+  const statsMapping = [
+    { label: "Forest Treasures", value: gameStats.forestTreasures },
+    { label: "Urban Artifacts", value: gameStats.urbanArtifacts },
+    { label: "Desert Relics", value: gameStats.desertRelics }
+  ];
+
+  for (const stat of statsMapping) {
+    if (stat.value > 0) {
+      const p = document.createElement('p');
+      p.textContent = `${stat.label}: ${stat.value}`;
+      list.appendChild(p);
+    }
   }
 }
 
@@ -377,8 +405,11 @@ function loadLocalData() {
   if (data) {
     try {
       const parsed = JSON.parse(data);
-      if (parsed.totalSteps) gameStats.totalSteps = parsed.totalSteps;
-      if (parsed.destroyedElements) gameStats.destroyedElements = parsed.destroyedElements;
+      if (parsed.totalSteps !== undefined) gameStats.totalSteps = parsed.totalSteps;
+      if (parsed.forestTreasures !== undefined) gameStats.forestTreasures = parsed.forestTreasures;
+      if (parsed.urbanArtifacts !== undefined) gameStats.urbanArtifacts = parsed.urbanArtifacts;
+      if (parsed.desertRelics !== undefined) gameStats.desertRelics = parsed.desertRelics;
+      if (parsed.hiddenCatBonus !== undefined) gameStats.hiddenCatBonus = parsed.hiddenCatBonus;
     } catch(e) { console.error("Error parsing local data", e); }
   }
 }
@@ -387,29 +418,81 @@ function saveLocalData() {
   localStorage.setItem('zenWalkData', JSON.stringify(gameStats));
 }
 
+async function loadServerData(playerID) {
+  try {
+    const payload = { action: "load", playerID: playerID };
+    const res = await fetch(GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    const result = await res.json();
+    if (result.status === "success" && result.data) {
+      userProfile.gender = result.data.gender || userProfile.gender;
+      userProfile.petType = result.data.petType || userProfile.petType;
+      gameStats.totalSteps = result.data.totalSteps || 0;
+      gameStats.forestTreasures = result.data.forestTreasures || 0;
+      gameStats.urbanArtifacts = result.data.urbanArtifacts || 0;
+      gameStats.desertRelics = result.data.desertRelics || 0;
+      gameStats.hiddenCatBonus = result.data.hiddenCatBonus || 0;
+      saveLocalData();
+    }
+  } catch (e) {
+    console.error("Error loading server data:", e);
+    // Fallback to local data
+    loadLocalData();
+  }
+}
+
 function syncData() {
-  if (!userProfile.username) return;
+  if (!userProfile.playerID) return;
   
   const payload = {
-    username: userProfile.username,
+    action: "save",
+    playerID: userProfile.playerID,
     gender: userProfile.gender,
     petType: userProfile.petType,
-    statsData: {
-      totalSteps: gameStats.totalSteps,
-      destroyedElements: gameStats.destroyedElements
-    }
+    totalSteps: gameStats.totalSteps,
+    forestTreasures: gameStats.forestTreasures,
+    urbanArtifacts: gameStats.urbanArtifacts,
+    desertRelics: gameStats.desertRelics,
+    hiddenCatBonus: gameStats.hiddenCatBonus
   };
   
   fetch(GAS_URL, {
     method: 'POST',
-    body: JSON.stringify(payload),
-    mode: 'no-cors'
-  }).then(() => {
-    stepsSinceSync = 0;
+    body: JSON.stringify(payload)
+  }).then(res => res.json())
+  .then((result) => {
+    if(result.status === "success"){
+       stepsSinceSync = 0;
+    }
   }).catch(e => {
     console.error("Sync failed, will retry later.", e);
   });
 }
+
+setInterval(() => {
+  if (currentState === GAME_STATE.PLAYING && stepsSinceSync > 0) {
+     syncData();
+  }
+}, 5 * 60 * 1000);
+
+window.addEventListener('beforeunload', () => {
+   if (stepsSinceSync > 0 && userProfile.playerID) {
+      const payload = {
+        action: "save",
+        playerID: userProfile.playerID,
+        gender: userProfile.gender,
+        petType: userProfile.petType,
+        totalSteps: gameStats.totalSteps,
+        forestTreasures: gameStats.forestTreasures,
+        urbanArtifacts: gameStats.urbanArtifacts,
+        desertRelics: gameStats.desertRelics,
+        hiddenCatBonus: gameStats.hiddenCatBonus
+      };
+      navigator.sendBeacon(GAS_URL, JSON.stringify(payload));
+   }
+});
 
 function incrementStep() {
   gameStats.totalSteps++;
@@ -419,17 +502,40 @@ function incrementStep() {
   if (gameStats.totalSteps % 1000 === 0) {
     spawnParticle(player.x, player.y, `${gameStats.totalSteps / 1000}K!`, '#FFD700');
   }
+
+  updateDayNightCycle();
   
   if (stepsSinceSync >= SYNC_THRESHOLD) {
     syncData();
   }
 }
 
-function incrementDestroyed(type) {
-  if (!gameStats.destroyedElements[type]) {
-    gameStats.destroyedElements[type] = 0;
+function updateDayNightCycle() {
+  const overlay = document.getElementById('dayNightOverlay');
+  const cycle = Math.floor(gameStats.totalSteps / 1000) % 2;
+  if (cycle === 1) {
+    overlay.classList.add('night');
+  } else {
+    overlay.classList.remove('night');
   }
-  gameStats.destroyedElements[type]++;
+}
+
+function collectItem(type) {
+  let category = '';
+  if (type.startsWith('forest')) {
+    gameStats.forestTreasures++;
+    category = 'forestTreasures';
+  } else if (type.startsWith('city')) {
+    gameStats.urbanArtifacts++;
+    category = 'urbanArtifacts';
+  } else if (type.startsWith('desert')) {
+    gameStats.desertRelics++;
+    category = 'desertRelics';
+  }
+
+  if (category && gameStats[category] % 100 === 0 && gameStats[category] > 0) {
+      spawnParticle(player.x, player.y - 1, "+100", '#0F0');
+  }
   saveLocalData();
 }
 
@@ -468,7 +574,7 @@ function pseudoRandom(x, y) {
   return n - Math.floor(n);
 }
 
-function getBiome(x, y) {
+function getRawBiome(x, y) {
   const scale = 0.02; // Much larger continuous biomes
   const nx = Math.floor(x * scale);
   const ny = Math.floor(y * scale);
@@ -479,6 +585,23 @@ function getBiome(x, y) {
   if (n < 0.6) return 'desert';
   if (n < 0.9) return 'city';
   return 'sea';
+}
+
+function getBiome(x, y) {
+  const rawBiome = getRawBiome(x, y);
+  if (rawBiome === 'sea') return 'sea';
+
+  // If this tile is land but borders a sea tile, force it to be desert (sand/beach)
+  const topBiome = getRawBiome(x, y - 1);
+  const bottomBiome = getRawBiome(x, y + 1);
+  const leftBiome = getRawBiome(x - 1, y);
+  const rightBiome = getRawBiome(x + 1, y);
+
+  if (topBiome === 'sea' || bottomBiome === 'sea' || leftBiome === 'sea' || rightBiome === 'sea') {
+     return 'desert';
+  }
+
+  return rawBiome;
 }
 
 function getTileKey(x, y) {
@@ -591,7 +714,7 @@ function handleActionA() {
     if (targetTile.destructible) {
       soundCut();
       spawnParticle(targetX, targetY, "+1", '#FFF');
-      incrementDestroyed(targetTile.type);
+      collectItem(targetTile.type);
       
       const baseGroundType = targetTile.biome === 'forest' ? 'forest_grass' : 
                              targetTile.biome === 'desert' ? 'desert_sand' : 'city_pavement';
@@ -679,53 +802,156 @@ function tryStartPlayerMove() {
   }
 }
 
-function updatePlayerAndSidekick(dt) {
-  if (player.isMoving) {
-    if (moveEntity(player, dt)) {
-      incrementStep();
-      lastIdleTime = performance.now();
-      
-      if (sidekick.active && !sidekick.isMoving && sidekick.queue.length > 0) {
-         const nextPos = sidekick.queue.shift();
-         sidekick.isMoving = true;
-         sidekick.state = 'walking';
-         sidekick.targetX = nextPos.x;
-         sidekick.targetY = nextPos.y;
-         sidekick.startX = sidekick.x;
-         sidekick.startY = sidekick.y;
-         sidekick.dir = nextPos.dir;
-         sidekick.moveTimer = 0;
-         sidekick.legToggle = player.legToggle;
+function updateSidekickDog(dt) {
+  if (sidekick.isMoving) {
+    if(moveEntity(sidekick, dt)) {
+      if (sidekick.fsmState === 'seek' && sidekick.seekTarget) {
+        // Did we reach next to it?
+        const dist = Math.abs(sidekick.x - sidekick.seekTarget.x) + Math.abs(sidekick.y - sidekick.seekTarget.y);
+        if (dist <= 1) {
+          sidekick.fsmState = 'sit';
+          sidekick.state = 'idle';
+          sidekick.frame = 1;
+          if (sidekick.x < sidekick.seekTarget.x) sidekick.dir = 'right';
+          else if (sidekick.x > sidekick.seekTarget.x) sidekick.dir = 'left';
+          else if (sidekick.y < sidekick.seekTarget.y) sidekick.dir = 'down';
+          else if (sidekick.y > sidekick.seekTarget.y) sidekick.dir = 'up';
+        }
       }
     }
   } else {
-    tryStartPlayerMove();
-  }
-  
-  if (sidekick.active) {
-    if (sidekick.isMoving) {
-      if(moveEntity(sidekick, dt)) {
-         if (sidekick.queue.length > 0 && !player.isMoving) {
-             const nextPos = sidekick.queue.shift();
-             sidekick.isMoving = true;
-             sidekick.targetX = nextPos.x;
-             sidekick.targetY = nextPos.y;
-             sidekick.startX = sidekick.x;
-             sidekick.startY = sidekick.y;
-             sidekick.dir = nextPos.dir;
-             sidekick.moveTimer = 0;
-             sidekick.legToggle = !sidekick.legToggle;
+    // If sitting, check if player moved too far or item collected
+    if (sidekick.fsmState === 'sit') {
+       const key = getTileKey(sidekick.seekTarget.x, sidekick.seekTarget.y);
+       const targetTile = activeTiles[key];
+       const playerDist = Math.abs(player.x - sidekick.x) + Math.abs(player.y - sidekick.y);
+
+       if (!targetTile || !targetTile.destructible || playerDist > 12) {
+         sidekick.fsmState = 'follow';
+         sidekick.seekTarget = null;
+         sidekick.queue = []; // Reset queue
+       } else {
+         return; // Just sit
+       }
+    }
+
+    // Check if we can seek
+    if (sidekick.fsmState === 'follow' && !player.isMoving) {
+      if (Math.random() < 0.05) { // Scan occasionally
+         let found = null;
+         let minDist = 100;
+         for (let x = player.x - 10; x <= player.x + 10; x++) {
+           for (let y = player.y - 10; y <= player.y + 10; y++) {
+              const key = getTileKey(x, y);
+              const tile = activeTiles[key];
+              if (tile && tile.destructible) {
+                 const dist = Math.abs(sidekick.x - x) + Math.abs(sidekick.y - y);
+                 if (dist < minDist) {
+                    minDist = dist;
+                    found = {x, y};
+                 }
+              }
+           }
+         }
+         if (found) {
+            sidekick.fsmState = 'seek';
+            sidekick.seekTarget = found;
+            sidekick.queue = []; // Stop following player
          }
       }
-    } else {
+    }
+
+    if (sidekick.fsmState === 'seek' && sidekick.seekTarget) {
+       // Simple pathing towards target
+       let dx = 0; let dy = 0;
+       if (sidekick.x < sidekick.seekTarget.x) dx = 1;
+       else if (sidekick.x > sidekick.seekTarget.x) dx = -1;
+       else if (sidekick.y < sidekick.seekTarget.y) dy = 1;
+       else if (sidekick.y > sidekick.seekTarget.y) dy = -1;
+
+       const nextX = sidekick.x + dx;
+       const nextY = sidekick.y + dy;
+       const distToTarget = Math.abs(nextX - sidekick.seekTarget.x) + Math.abs(nextY - sidekick.seekTarget.y);
+
+       if (distToTarget === 0) { // Don't walk ON the object
+          sidekick.fsmState = 'sit';
+          return;
+       }
+
+       const key = getTileKey(nextX, nextY);
+       const tile = activeTiles[key];
+       if (!tile || !tile.solid) {
+         sidekick.isMoving = true;
+         sidekick.state = 'walking';
+         sidekick.targetX = nextX;
+         sidekick.targetY = nextY;
+         sidekick.startX = sidekick.x;
+         sidekick.startY = sidekick.y;
+         sidekick.dir = dx > 0 ? 'right' : dx < 0 ? 'left' : dy > 0 ? 'down' : 'up';
+         sidekick.moveTimer = 0;
+         sidekick.legToggle = !sidekick.legToggle;
+       } else {
+         sidekick.fsmState = 'sit'; // Stuck, just sit
+       }
+       return;
+    }
+
+    // Follow logic
+    if (sidekick.fsmState === 'follow' && sidekick.queue.length > 0) {
+        const nextPos = sidekick.queue.shift();
+        sidekick.isMoving = true;
+        sidekick.state = 'walking';
+        sidekick.targetX = nextPos.x;
+        sidekick.targetY = nextPos.y;
+        sidekick.startX = sidekick.x;
+        sidekick.startY = sidekick.y;
+        sidekick.dir = nextPos.dir;
+        sidekick.moveTimer = 0;
+        sidekick.legToggle = !sidekick.legToggle;
+    } else if (sidekick.fsmState === 'follow') {
       if (!player.isMoving && performance.now() - lastIdleTime > 2000) {
          if (sidekick.x < player.x) sidekick.dir = 'right';
          else if (sidekick.x > player.x) sidekick.dir = 'left';
          else if (sidekick.y < player.y) sidekick.dir = 'down';
          else if (sidekick.y > player.y) sidekick.dir = 'up';
       }
-      
-      if (sidekick.queue.length > 0) {
+    }
+  }
+}
+
+function updateSidekickCat(dt) {
+  if (sidekick.isMoving) {
+    if(moveEntity(sidekick, dt)) {
+      // Finished moving
+    }
+  } else {
+    if (sidekick.fsmState === 'idle') {
+       sidekick.idleTimer -= dt;
+       sidekick.state = 'idle';
+       // Check proximity
+       const dist = Math.abs(player.x - sidekick.x) + Math.abs(player.y - sidekick.y);
+       if (dist <= 1) {
+          gameStats.hiddenCatBonus++;
+          spawnParticle(sidekick.x, sidekick.y - 1, "♥️", '#FF69B4');
+          soundCut();
+          saveLocalData();
+          sidekick.fsmState = 'follow'; // Stop idling once bonus is claimed
+          sidekick.idleTimer = 0;
+       } else if (sidekick.idleTimer <= 0) {
+         sidekick.fsmState = 'follow';
+       }
+       return;
+    }
+
+    if (sidekick.fsmState === 'follow') {
+       if (Math.random() < 0.005) { // Random chance to start idling
+          sidekick.fsmState = 'idle';
+          sidekick.idleTimer = 5000 + Math.random() * 5000; // Idle for 5-10 seconds
+          sidekick.queue = [];
+          return;
+       }
+
+       if (sidekick.queue.length > 0) {
           const nextPos = sidekick.queue.shift();
           sidekick.isMoving = true;
           sidekick.state = 'walking';
@@ -736,7 +962,39 @@ function updatePlayerAndSidekick(dt) {
           sidekick.dir = nextPos.dir;
           sidekick.moveTimer = 0;
           sidekick.legToggle = !sidekick.legToggle;
+      } else {
+        if (!player.isMoving && performance.now() - lastIdleTime > 2000) {
+           if (sidekick.x < player.x) sidekick.dir = 'right';
+           else if (sidekick.x > player.x) sidekick.dir = 'left';
+           else if (sidekick.y < player.y) sidekick.dir = 'down';
+           else if (sidekick.y > player.y) sidekick.dir = 'up';
+        }
       }
+    }
+  }
+}
+
+function updatePlayerAndSidekick(dt) {
+  if (player.isMoving) {
+    if (moveEntity(player, dt)) {
+      incrementStep();
+      lastIdleTime = performance.now();
+
+      if (sidekick.active && sidekick.fsmState === 'follow' && userProfile.petType === 'None') {
+          // If none pet, don't do anything
+      } else if (sidekick.active && sidekick.fsmState === 'follow') {
+        sidekick.queue.push({x: player.x, y: player.y, dir: player.dir});
+      }
+    }
+  } else {
+    tryStartPlayerMove();
+  }
+
+  if (sidekick.active) {
+    if (userProfile.petType === 'Dog') {
+      updateSidekickDog(dt);
+    } else if (userProfile.petType === 'Cat') {
+      updateSidekickCat(dt);
     }
   }
 }
@@ -752,6 +1010,69 @@ function updateParticles(dt) {
     p.y -= (dt / 1000) * 2;
     if (p.life <= 0) particles.splice(i, 1);
   }
+}
+
+// --- Minimap ---
+let minimapCanvas;
+let minimapCtx;
+let offscreenMinimap;
+let offscreenMinimapCtx;
+let lastMinimapUpdate = 0;
+
+function initMinimap() {
+  minimapCanvas = document.getElementById('minimap');
+  minimapCtx = minimapCanvas.getContext('2d', { alpha: false });
+
+  minimapCanvas.width = 100;
+  minimapCanvas.height = 100;
+
+  if (window.OffscreenCanvas) {
+    offscreenMinimap = new OffscreenCanvas(100, 100);
+  } else {
+    offscreenMinimap = document.createElement('canvas');
+    offscreenMinimap.width = 100;
+    offscreenMinimap.height = 100;
+  }
+  offscreenMinimapCtx = offscreenMinimap.getContext('2d', { alpha: false });
+}
+
+function updateMinimap(timestamp) {
+  if (timestamp - lastMinimapUpdate < 1000) return; // 1Hz throttle
+  lastMinimapUpdate = timestamp;
+
+  const radius = 30; // 30 tile radius
+  const step = 3; // Downsample: check 1 out of 3 tiles
+  const pixelSize = 100 / ((radius * 2) / step); // Size of each block on the 100x100 canvas
+
+  offscreenMinimapCtx.fillStyle = '#000';
+  offscreenMinimapCtx.fillRect(0, 0, 100, 100);
+
+  let drawX = 0;
+  for (let x = player.x - radius; x <= player.x + radius; x += step) {
+    let drawY = 0;
+    for (let y = player.y - radius; y <= player.y + radius; y += step) {
+      const biome = getBiome(x, y);
+
+      switch (biome) {
+        case 'forest': offscreenMinimapCtx.fillStyle = '#2d5a27'; break; // Green
+        case 'desert': offscreenMinimapCtx.fillStyle = '#d2b48c'; break; // Tan/Sand
+        case 'city': offscreenMinimapCtx.fillStyle = '#808080'; break; // Gray
+        case 'sea': offscreenMinimapCtx.fillStyle = '#4682b4'; break; // Blue
+        default: offscreenMinimapCtx.fillStyle = '#000';
+      }
+
+      // Draw player indicator
+      if (Math.abs(x - player.x) <= step && Math.abs(y - player.y) <= step) {
+         offscreenMinimapCtx.fillStyle = '#FFF'; // White square for player
+      }
+
+      offscreenMinimapCtx.fillRect(drawX * pixelSize, drawY * pixelSize, pixelSize, pixelSize);
+      drawY++;
+    }
+    drawX++;
+  }
+
+  minimapCtx.drawImage(offscreenMinimap, 0, 0);
 }
 
 // --- Rendering ---
@@ -921,6 +1242,7 @@ function gameLoop(timestamp) {
     updatePlayerAndSidekick(dt);
     updateWorld();
     updateParticles(dt);
+    updateMinimap(timestamp);
   }
   
   if (currentState === GAME_STATE.PLAYING || currentState === GAME_STATE.PAUSED) {
