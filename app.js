@@ -771,6 +771,46 @@ function moveEntity(entity, dt) {
   }
 }
 
+// הוסף את פונקציות הרעש הדטרמיניסטיות והזיגזג מעל פונקציית tryStartPlayerMove
+
+// 1. deterministicNoise: פונקציית רעש דטרמיניסטית קוהרנטית (כמו Perlin פשוטה)
+function deterministicNoise(x, y, seed) {
+    let n = pseudoRandom(x + seed, y + seed);
+    let s = Math.sin(x * 0.5 + seed);
+    let c = Math.cos(y * 0.5 + seed);
+    return (n + s + c) / 3; // מנורמל בערך לטווח [-1, 1]
+}
+
+// 2. applyZigzag: פונקציית ההיסט המזגזגת
+function applyZigzag(x, y) {
+    // משתמשים ב deterministicNoise כדי לייצר היסט (Offset) בטווח [-3, 3] משבצות.
+    // אנו משתמשים בסידים שונים כדי שהזיגזג של x ו-y לא יהיה זהה
+    let xOffset = deterministicNoise(x, y, 1234.5) * 3;
+    let yOffset = deterministicNoise(x, y, 6789.0) * 3;
+    
+    return {
+        perturbedX: x + xOffset,
+        perturbedY: y + yOffset
+    };
+}
+
+// 3. getRawBiome המעודכנת
+function getRawBiome(x, y) {
+  // FIX: קרא ל-applyZigzag כדי לקבל קואורדינטות ה"מוסטות" ( perturbed) במקום המקוריות
+  const { perturbedX, perturbedY } = applyZigzag(x, y);
+  
+  const scale = 0.02; // אזורי ביומות גדולים ורציפים
+  const nx = Math.floor(perturbedX * scale);
+  const ny = Math.floor(perturbedY * scale);
+  
+  const n = pseudoRandom(nx, ny);
+  
+  if (n < 0.3) return 'forest';
+  if (n < 0.6) return 'desert';
+  if (n < 0.9) return 'city';
+  return 'sea';
+}
+
 function tryStartPlayerMove() {
   let dx = 0; let dy = 0;
   let newDir = player.dir;
