@@ -593,18 +593,34 @@ function getRawBiome(x, y) {
 
 function getBiome(x, y) {
   const rawBiome = getRawBiome(x, y);
+  // 1. ודא שכל משבצת שהוגדרה כים בפונקציית ההאש נשארת ים (גוף המים המרכזי).
   if (rawBiome === 'sea') return 'sea';
 
-  // If this tile is land but borders a sea tile, force it to be desert (sand/beach)
+  // 2. זיהוי ביומות של 8 המשבצות השכנות. כרגע המשבצת הזו היא יבשה.
+  // כיוונים ישירים
   const topBiome = getRawBiome(x, y - 1);
   const bottomBiome = getRawBiome(x, y + 1);
   const leftBiome = getRawBiome(x - 1, y);
   const rightBiome = getRawBiome(x + 1, y);
 
-  if (topBiome === 'sea' || bottomBiome === 'sea' || leftBiome === 'sea' || rightBiome === 'sea') {
-     return 'desert';
+  // כיוונים אלכסוניים (TL, TR, BL, BR)
+  const tlBiome = getRawBiome(x - 1, y - 1);
+  const trBiome = getRawBiome(x + 1, y - 1);
+  const blBiome = getRawBiome(x - 1, y + 1);
+  const brBiome = getRawBiome(x + 1, y + 1);
+
+  // 3. FIX: כפה גבול חול אם *מי מה-8 כיוונים השכנים* הוא ים.
+  if (
+    topBiome === 'sea' || bottomBiome === 'sea' ||
+    leftBiome === 'sea' || rightBiome === 'sea' ||
+    tlBiome === 'sea' || trBiome === 'sea' ||
+    blBiome === 'sea' || brBiome === 'sea'
+  ) {
+    // כפה על משבצת היבשה הזו להפוך לחוף (Desert)
+    return 'desert';
   }
 
+  // 4. אם אין ים בסביבה, החזר את הביומה המקורית מהאש.
   return rawBiome;
 }
 
